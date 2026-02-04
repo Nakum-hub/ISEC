@@ -1,0 +1,61 @@
+{
+  "name": "isec-desktop-app",
+  "version": "1.0.0",
+  "description": "Internal Security Evidence Collector - Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "cybersecurity",
+    "forensics",
+    "evidence",
+    "collection",
+    "security"
+  ],
+  "author": "ISEC Team",
+  "license": "MIT",
+  "build": {
+    "appId": "com.isec.evidence.collector",
+    "productName": "ISEC Evidence Collector",
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "certificateFile": "${env.WIN_CERT_FILE}",
+      "certificatePassword": "${env.WIN_CERT_PASSWORD}"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "identity": "${env.MAC_SIGN_IDENTITY}",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.6.0"
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0"
+  }
+}

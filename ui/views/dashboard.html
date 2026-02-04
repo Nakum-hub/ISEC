@@ -1,0 +1,101 @@
+<section id="dashboard" class="view active">
+    <div class="dashboard-header">
+        <h1>Security Dashboard</h1>
+        <div class="actions">
+            <button class="btn btn-primary" id="collect-btn">
+                <span class="btn-icon">🔍</span>
+                Collect Evidence
+            </button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card glassmorphism">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+                <h3 id="total-evidence">0</h3>
+                <p>Total Evidence</p>
+            </div>
+        </div>
+        <div class="stat-card glassmorphism">
+            <div class="stat-icon">🔒</div>
+            <div class="stat-info">
+                <h3 id="integrity-status">Verified</h3>
+                <p>Integrity Status</p>
+            </div>
+        </div>
+
+        <div class="stat-card glassmorphism">
+            <div class="stat-icon">KEY</div>
+            <div class="stat-info">
+                <h3 id="license-status">Unlicensed</h3>
+                <p id="license-plan">License Status</p>
+            </div>
+        </div>
+        <div class="stat-card glassmorphism">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-info">
+                <h3 id="last-collect">Never</h3>
+                <p>Last Collection</p>
+            </div>
+        </div>
+        <div class="stat-card glassmorphism">
+            <div class="stat-icon">📋</div>
+            <div class="stat-info">
+                <h3 id="reports-count">0</h3>
+                <p>Reports Generated</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="quick-actions glassmorphism">
+        <h3>Quick Actions</h3>
+        <div class="actions-grid">
+            <button class="action-btn" data-action="system-logs">
+                <span class="action-icon">🖥️</span>
+                <span>System Logs</span>
+            </button>
+            <button class="action-btn" data-action="browser-history">
+                <span class="action-icon">🌐</span>
+                <span>Browser History</span>
+            </button>
+            <button class="action-btn" data-action="network-connections">
+                <span class="action-icon">🔗</span>
+                <span>Network Connections</span>
+            </button>
+            <button class="action-btn" data-action="file-metadata">
+                <span class="action-icon">📁</span>
+                <span>File Metadata</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="quick-actions glassmorphism">
+        <h3>Offline Updates</h3>
+        <p id="update-status">No update checks yet.</p>
+        <div class="actions-grid">
+            <button class="action-btn" id="check-updates-btn">
+                <span class="action-icon">CHK</span>
+                <span>Check Updates</span>
+            </button>
+            <button class="action-btn" id="apply-update-btn" disabled>
+                <span class="action-icon">APPLY</span>
+                <span>Apply Update</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="quick-actions glassmorphism role-switcher">
+        <h3>Role Switch</h3>
+        <p id="current-role-label">Current role: Loading...</p>
+        <div class="role-switcher-controls">
+            <select id="role-select" class="role-select">
+                <option value="collector">Collector</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="exporter">Exporter</option>
+            </select>
+            <button class="btn btn-secondary" id="switch-role-btn">Switch Role</button>
+        </div>
+        <p class="role-switch-help">Role changes are logged for audit.</p>
+    </div>
+</section>

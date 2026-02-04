@@ -1,0 +1,151 @@
+/*
+Premium Security Timeline Styles
+Styles for the evidence timeline with smooth animations and modern glassmorphism
+*/
+
+.timeline-section {
+  margin-bottom: 2rem;
+}
+
+.timeline-date {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 1rem;
+}
+
+.timeline-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.timeline-item {
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(-20px);
+  animation: slideInRight 0.5s ease forwards;
+}
+
+.timeline-item:nth-child(1) { animation-delay: 0.5s; }
+.timeline-item:nth-child(2) { animation-delay: 0.6s; }
+.timeline-item:nth-child(3) { animation-delay: 0.7s; }
+.timeline-item:nth-child(4) { animation-delay: 0.8s; }
+.timeline-item:nth-child(5) { animation-delay: 0.9s; }
+.timeline-item:nth-child(n+6) { animation-delay: 1s; }
+
+@keyframes slideInRight {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.timeline-icon {
+  font-size: 1.5rem;
+  float: left;
+  margin-right: 1rem;
+}
+
+.timeline-content {
+  overflow: hidden;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.evidence-type {
+  font-weight: 600;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  font-size: 0.875rem;
+}
+
+.timestamp {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.timeline-body {
+  margin-bottom: 1rem;
+}
+
+.evidence-summary {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.chain-of-custody {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Evidence type specific styles */
+.evidence-type.system_logs { color: #64b5f6; }
+.evidence-type.browser_history { color: #81c784; }
+.evidence-type.network_connections { color: #ffb74d; }
+.evidence-type.file_metadata { color: #ba68c8; }
+.evidence-type.role_assignment { color: #ff8a65; }
+.evidence-type.consent_record { color: #9575cd; }
+.evidence-type.retention_expiry_flag { color: #f06292; }
+.evidence-type.evidence_deletion { color: #e57373; }
+
+/* Severity indicators */
+.severity {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.severity:has(.status-valid) {
+  color: var(--success-green);
+}
+
+.severity:has(.status-invalid) {
+  color: var(--danger-red);
+}
+
+/* Hover effects */
+.timeline-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 122, 204, 0.15);
+  border-color: rgba(100, 140, 200, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .timeline-actions {
+    justify-content: flex-start;
+  }
+  
+  .chain-of-custody {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,232 @@
+/*
+Premium Security Dashboard Styles
+Styles for the dashboard cards and metrics with glassmorphism and smooth transitions
+*/
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.dashboard-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--highlight-gradient);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(0, 122, 204, 0.2);
+}
+
+.dashboard-card:hover::before {
+  opacity: 0.05;
+}
+
+.metric {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+  background: var(--highlight-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric.status-valid {
+  background: var(--success-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric.status-invalid {
+  background: var(--danger-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Confidence Meter */
+.confidence-meter {
+  height: 12px;
+  background: var(--card-bg);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  margin: 1rem 0;
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--card-border);
+}
+
+.confidence-meter-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--success-gradient);
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 4px;
+}
+
+.confidence-meter.medium .confidence-meter-fill {
+  background: var(--warning-gradient);
+}
+
+.confidence-meter.low .confidence-meter-fill {
+  background: var(--danger-gradient);
+}
+
+.confidence-meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* Export Readiness Section */
+.export-readiness-section {
+  margin-bottom: 2rem;
+}
+
+.export-readiness-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--card-border);
+  transition: all 0.3s ease;
+  justify-content: space-between;
+}
+
+.export-ready {
+  color: var(--success-green);
+  font-weight: 500;
+}
+
+.export-not-ready {
+  color: var(--danger-red);
+  font-weight: 500;
+}
+
+.role-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.role-switcher-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.role-select {
+  min-width: 180px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.role-switch-help,
+#current-role-label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Status badges */
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--glass-backdrop);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.status-badge::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success-green);
+}
+
+.status-integrity-valid {
+  background: var(--success-gradient);
+  color: white;
+}
+
+.status-integrity-warning {
+  background: var(--warning-gradient);
+  color: #212529;
+}
+
+.status-integrity-danger {
+  background: var(--danger-gradient);
+  color: white;
+}
+
+.status-integrity-danger::before {
+  background: var(--danger-red);
+}
+
+.status-integrity-warning::before {
+  background: var(--warning-yellow);
+}
+
+.status-integrity-valid::before {
+  background: var(--success-green);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .export-readiness-indicator {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

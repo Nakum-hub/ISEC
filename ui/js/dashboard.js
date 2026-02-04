@@ -1,0 +1,313 @@
+// Dashboard functionality (IPC provided via window.isec IPC bridge)
+
+function getIsecBridge() {
+  if (typeof window === 'undefined' || !window.isec || typeof window.isec.invoke !== 'function') {
+    return null;
+  }
+  return window.isec;
+}
+
+let dashboardRefreshTimer = null;
+
+async function initializeDashboard() {
+  // Add event listeners
+  const collectBtn = document.getElementById('collect-btn');
+  if (collectBtn) {
+    collectBtn.addEventListener('click', startEvidenceCollection);
+  }
+  
+  // Add quick action buttons
+  document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const action = this.getAttribute('data-action');
+      performQuickAction(action);
+    });
+  });
+
+  const checkUpdatesBtn = document.getElementById('check-updates-btn');
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener('click', checkForUpdates);
+  }
+
+  const applyUpdateBtn = document.getElementById('apply-update-btn');
+  if (applyUpdateBtn) {
+    applyUpdateBtn.addEventListener('click', applyUpdate);
+  }
+
+  const switchRoleBtn = document.getElementById('switch-role-btn');
+  if (switchRoleBtn) {
+    switchRoleBtn.addEventListener('click', switchRole);
+  }
+
+  if (!dashboardRefreshTimer) {
+    dashboardRefreshTimer = setInterval(() => {
+      loadDashboardStats();
+    }, 15000);
+  }
+
+  checkForUpdates();
+}
+
+async function loadDashboardStats() {
+  try {
+    const bridge = getIsecBridge();
+    if (!bridge) {
+      return;
+    }
+
+    const status = await bridge.invoke('get-backend-status');
+    const retention = await bridge.invoke('get-retention-status');
+    const integrity = await bridge.invoke('get-system-integrity');
+
+    const totalEvidence = status && typeof status.evidenceItemsCount === 'number'
+      ? status.evidenceItemsCount
+      : (retention && typeof retention.total_evidence === 'number' ? retention.total_evidence : 0);
+    document.getElementById('total-evidence').textContent = String(totalEvidence);
+    document.getElementById('integrity-status').textContent = integrity && integrity.status ? integrity.status : 'unknown';
+    document.getElementById('last-collect').textContent = 'N/A';
+    document.getElementById('reports-count').textContent = 'N/A';
+
+    const license = status && status.license ? status.license : null;
+    updateLicenseUI(license);
+    updatePermissionUI(status);
+    updateRoleSwitcher(status);
+  } catch (error) {
+    console.error('Error loading dashboard stats:', error);
+  }
+}
+
+function updateLicenseUI(license) {
+  const licenseStatusEl = document.getElementById('license-status');
+  const licensePlanEl = document.getElementById('license-plan');
+
+  if (!licenseStatusEl || !licensePlanEl) {
+    return;
+  }
+
+  if (!license) {
+    licenseStatusEl.textContent = 'Unknown';
+    licensePlanEl.textContent = 'License Status';
+    return;
+  }
+
+  licenseStatusEl.textContent = license.valid ? 'Licensed' : 'Unlicensed';
+  licensePlanEl.textContent = license.plan ? `Plan: ${license.plan}` : (license.message || 'License Status');
+
+}
+
+function updatePermissionUI(status) {
+  const collectBtn = document.getElementById('collect-btn');
+  if (!collectBtn || !status) {
+    return;
+  }
+
+  const permissions = Array.isArray(status.permissions) ? status.permissions : [];
+  const canCollect = permissions.includes('collect');
+  const tampered = !!status.tamperingDetected;
+  const licenseValid = status.license ? !!status.license.valid : true;
+
+  collectBtn.disabled = !canCollect || tampered || !licenseValid;
+
+  if (!licenseValid) {
+    collectBtn.title = (status.license && status.license.message) ? status.license.message : 'Valid license required';
+  } else if (tampered) {
+    collectBtn.title = 'Evidence collection locked due to tampering detection.';
+  } else if (!canCollect) {
+    collectBtn.title = 'Collector role required to collect evidence.';
+  } else {
+    collectBtn.title = '';
+  }
+}
+
+function updateRoleSwitcher(status) {
+  const roleLabel = document.getElementById('current-role-label');
+  const roleSelect = document.getElementById('role-select');
+  const switchBtn = document.getElementById('switch-role-btn');
+
+  if (!roleLabel || !roleSelect || !switchBtn || !status) {
+    return;
+  }
+
+  const currentRole = status.role || 'unknown';
+  roleLabel.textContent = `Current role: ${currentRole}`;
+  if (roleSelect.value !== currentRole && ['collector', 'reviewer', 'exporter'].includes(currentRole)) {
+    roleSelect.value = currentRole;
+  }
+
+  if (status.tamperingDetected) {
+    switchBtn.disabled = true;
+    switchBtn.title = 'Role switching is blocked due to tampering detection.';
+  } else {
+    switchBtn.disabled = false;
+    switchBtn.title = '';
+  }
+}
+
+async function switchRole() {
+  const bridge = getIsecBridge();
+  if (!bridge) {
+    alert('Role switching is not available in this environment.');
+    return;
+  }
+
+  const roleSelect = document.getElementById('role-select');
+  if (!roleSelect) {
+    return;
+  }
+
+  const targetRole = String(roleSelect.value || '').toLowerCase();
+  if (!['collector', 'reviewer', 'exporter'].includes(targetRole)) {
+    alert('Invalid role selection.');
+    return;
+  }
+
+  const confirmSwitch = confirm(`Switch role to ${targetRole}? This action is logged.`);
+  if (!confirmSwitch) {
+    return;
+  }
+
+  try {
+    const result = await bridge.invoke('set-user-role', targetRole);
+    if (result && result.success) {
+      const status = result.status || null;
+      if (status) {
+        updatePermissionUI(status);
+        updateRoleSwitcher(status);
+      }
+      if (typeof refreshDetailPermissions === 'function') {
+        refreshDetailPermissions().catch(() => {});
+      }
+      if (typeof refreshReportPermissions === 'function') {
+        refreshReportPermissions().catch(() => {});
+      }
+      alert(result.message || 'Role updated.');
+      loadDashboardStats();
+    } else {
+      alert((result && result.message) ? result.message : 'Role change failed.');
+    }
+  } catch (error) {
+    console.error('Role switch failed:', error);
+    alert('Role change failed: ' + error.message);
+  }
+}
+
+async function checkForUpdates() {
+  try {
+    const bridge = getIsecBridge();
+    if (!bridge) {
+      return;
+    }
+    const status = await bridge.invoke('check-for-updates');
+    const updateStatus = document.getElementById('update-status');
+    const applyBtn = document.getElementById('apply-update-btn');
+
+    if (!updateStatus || !applyBtn) {
+      return;
+    }
+
+    if (status && status.available) {
+      updateStatus.textContent = `Update available: v${status.availableVersion} (current v${status.currentVersion})`;
+      applyBtn.disabled = false;
+    } else {
+      const reason = status && status.reason ? status.reason.replace(/_/g, ' ') : 'no update available';
+      updateStatus.textContent = `No update available (${reason}).`;
+      applyBtn.disabled = true;
+    }
+  } catch (error) {
+    console.error('Update check failed:', error);
+  }
+}
+
+async function applyUpdate() {
+  try {
+    const bridge = getIsecBridge();
+    if (!bridge) {
+      return;
+    }
+    const result = await bridge.invoke('apply-update');
+    alert(result && result.message ? result.message : 'Update could not be started.');
+  } catch (error) {
+    console.error('Apply update failed:', error);
+    alert('Apply update failed: ' + error.message);
+  }
+}
+
+async function startEvidenceCollection() {
+  const bridge = getIsecBridge();
+  if (!bridge) {
+    console.error('Dashboard: Cannot start evidence collection, IPC not available');
+    alert('Evidence collection is not available in this environment.');
+    return;
+  }
+  
+  try {
+    const backendStatus = await bridge.invoke('get-backend-status');
+    if (backendStatus && backendStatus.license && !backendStatus.license.valid) {
+      alert(backendStatus.license.message || 'Valid license required to collect evidence.');
+      return;
+    }
+    const consent = backendStatus && backendStatus.browserConsent ? backendStatus.browserConsent : null;
+    if (consent && (consent.status === 'PENDING' || consent.status === 'EXPIRED')) {
+      const wantConsent = confirm('Browser history collection requires consent. Do you want to grant consent now?');
+      if (wantConsent) {
+        const timeChoice = prompt(
+          'Select browser history time range:\n1. Last 24 hours\n2. Last 7 days\n3. Last 30 days\n4. All time',
+          '2'
+        );
+
+        const timeMap = {
+          '1': 'last_24h',
+          '2': 'last_7d',
+          '3': 'last_30d',
+          '4': 'all_time'
+        };
+        const timeRange = timeMap[String(timeChoice || '').trim()];
+        if (!timeRange) {
+          alert('Browser consent not updated: invalid time range selection.');
+        } else {
+          const browsersInput = prompt('Optional: Enter browsers to scan (comma-separated) or leave blank for all:', '');
+          const browsers = String(browsersInput || '')
+            .split(',')
+            .map((b) => b.trim())
+            .filter(Boolean);
+
+          const consentResult = await bridge.invoke('set-browser-consent', { timeRange, browsers });
+          if (!consentResult || !consentResult.success) {
+            alert((consentResult && consentResult.message) ? consentResult.message : 'Failed to update browser consent.');
+          }
+        }
+      }
+    }
+
+    showLoading();
+    const result = await bridge.invoke('start-evidence-collection', {});
+    
+    if (result.success) {
+      // Update dashboard stats
+      document.getElementById('total-evidence').textContent = result.evidenceCount;
+      document.getElementById('integrity-status').textContent = result.integrityStatus;
+      document.getElementById('last-collect').textContent = new Date().toLocaleTimeString();
+      const reportsEl = document.getElementById('reports-count');
+      if (reportsEl) {
+        const current = parseInt(reportsEl.textContent, 10);
+        if (!Number.isNaN(current)) {
+          reportsEl.textContent = String(current + 1);
+        }
+      }
+      
+      alert('Evidence collection completed successfully!');
+    } else {
+      // Show a clear message when collection is denied or blocked
+      alert(result.message || 'Evidence collection could not be started.');
+    }
+  } catch (error) {
+    console.error('Error during evidence collection:', error);
+    alert('Error during evidence collection: ' + error.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+function performQuickAction(action) {
+  alert('Quick actions are not available in this build. Use Collect Evidence for verified collection.');
+}

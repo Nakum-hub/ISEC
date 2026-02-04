@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' file:">
+    <title>ISEC - Internal Security Evidence Collector</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/timeline.css">
+    <link rel="stylesheet" href="css/detail-view.css">
+    <link rel="stylesheet" href="css/report-export.css">
+</head>
+<body>
+    <!-- Custom Window Controls -->
+    <div class="window-controls">
+        <div class="window-title">ISEC - Internal Security Evidence Collector</div>
+        <div class="control-buttons">
+            <button id="minimize-window-btn" class="control-btn minimize-btn">−</button>
+            <button id="maximize-window-btn" class="control-btn maximize-btn">□</button>
+            <button id="close-window-btn" class="control-btn close-btn">×</button>
+        </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="logo-section">
+            <div class="logo">ISEC</div>
+            <div class="app-name">Evidence Collector</div>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item active" data-view="dashboard">
+                <i class="icon dashboard-icon"></i>
+                <span>Dashboard</span>
+            </li>
+            <li class="nav-item" data-view="timeline">
+                <i class="icon timeline-icon"></i>
+                <span>Evidence Timeline</span>
+            </li>
+            <li class="nav-item" data-view="detail">
+                <i class="icon detail-icon"></i>
+                <span>Evidence Details</span>
+            </li>
+            <li class="nav-item" data-view="report">
+                <i class="icon report-icon"></i>
+                <span>Report Export</span>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Dashboard View - Loaded from views/dashboard.html -->
+        <div id="dashboard-container"></div>
+        
+        <!-- Timeline View - Loaded from views/timeline.html -->
+        <div id="timeline-container"></div>
+        
+        <!-- Detail View -->
+        <section id="detail" class="view">
+            <div class="detail-header">
+                <h1>Evidence Details</h1>
+                <div class="detail-actions">
+                    <button class="btn btn-secondary" id="refresh-detail">Refresh</button>
+                    <button class="btn btn-primary" id="export-evidence">Export</button>
+                </div>
+            </div>
+
+            <!-- Evidence Detail Panel - Loaded from components/evidence-detail-panel.html -->
+            <div id="detail-panel-container"></div>
+        </section>
+
+        <!-- Report Export View -->
+        <section id="report" class="view">
+            <div class="report-header">
+                <h1>Report Export</h1>
+            </div>
+
+            <div class="report-options glassmorphism">
+                <h3>Export Options</h3>
+                <div class="option-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-system-logs" checked>
+                        <span class="checkmark"></span>
+                        Include System Logs
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-browser-history" checked>
+                        Include Browser History
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-network-data" checked>
+                        Include Network Data
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-file-metadata" checked>
+                        Include File Metadata
+                    </label>
+                </div>
+
+                <div class="format-selection">
+                    <label>Export Format:</label>
+                    <select id="export-format">
+                        <option value="pdf">PDF Report</option>
+                        <option value="zip">ZIP Archive</option>
+                        <option value="csv">CSV Data</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary btn-large" id="generate-report">
+                    Generate Report
+                </button>
+            </div>
+
+            <div class="report-preview glassmorphism">
+                <h3>Report Preview</h3>
+                <div id="preview-content">
+                    <p>Select evidence types and format to see preview</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Processing Evidence...</p>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/timeline.js"></script>
+    <script src="js/detail-view.js"></script>
+    <script src="js/report-export.js"></script>
+    <script src="js/bootstrap.js"></script>
+</body>
+</html>

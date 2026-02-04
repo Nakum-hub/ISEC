@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "evidence_db_hash": "3aa03a12c06fa21072033b06eb738a7ecec94adb0bcbc633eb66698e36933fc2",
+    "generation_timestamp": "2026-02-03T22:04:28.005523",
+    "report_filename": "forensic_report_20260203_220427.pdf",
+    "report_hash": "f306044c28201773db941aca50021431ba33fd1a750009611ce64f02167baa3e",
+    "signature_format": "ISEC_PDF_v1",
+    "system_fingerprint": "34a5541125b357788b5c7029e4b7ff21101cf49c61b5c95585dc4a63a823966b",
+    "system_info": {
+      "hostname": "Naveen",
+      "machine": "AMD64",
+      "os": "Windows",
+      "os_version": "10.0.26200",
+      "platform": "Windows-10-10.0.26200-SP0",
+      "processor": "Intel64 Family 6 Model 154 Stepping 4, GenuineIntel",
+      "user": "sadas"
+    }
+  },
+  "payload_hash": "64ec4f34bc5d079bcbc5f6348487fab92b772e1e66e880c2e802e57f9917872b",
+  "signature": "039b73a8136f3ad02e9c317818785caf49ada40823143cb7d0d26a9ee44a08342ddeecae4e7848188b28c402b70475d48ba5adc1c701228ae99c59b626be82008336f3ea05de5f60621ddf760de12ac2318388f731c9b6abe7338fc9c2a0cc2ad01c3b777295881f75ff16e9b774b350dbb741015749efef7e919fb4356c8e36c148eb342c9c7b21a94bbae8dd38f9ed5c60675154726bf9145d141a4943d5db81cf3c2c301d2c8dcf3b8788bbb8c6fafd5aa094ce1ab740c2e7e72ebe50ddcc491a7c956437f481f03aea71d1cec637fcafeaf0af733b86f5680946ecdc68defed0901cd53161dbbf8eb03a890709c86eb9cd8bcec8cc34cb72bffc2ddd7dec"
+}
