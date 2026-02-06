@@ -132,6 +132,51 @@ class EvidenceCollector:
         expired_result = self.retention_engine.flag_expired_evidence()
         if expired_result['flagged'] > 0:
             print(f"Flagged {expired_result['flagged']} expired evidence items")
+
+    def collect_selected_evidence(self, evidence_types):
+        """Collect only selected evidence types."""
+        if self.tampering_detected:
+            print("Evidence collection disabled due to tampering detection.")
+            return
+
+        if not self.role_manager.has_permission('collect'):
+            print(f"Access denied: Role '{self.current_role['name']}' does not have permission to collect evidence.")
+            return
+
+        type_map = {
+            'system_logs': self.system_logs_collector,
+            'browser_history': self.browser_history_collector,
+            'network_connections': self.network_connections_collector,
+            'file_metadata': self.file_metadata_collector
+        }
+
+        selected = [t for t in (evidence_types or []) if t in type_map]
+        if not selected:
+            print("No valid evidence types selected. Skipping collection.")
+            return
+
+        for evidence_type in selected:
+            collector = type_map.get(evidence_type)
+            if not collector:
+                continue
+            if evidence_type == 'system_logs':
+                print("Collecting system logs...")
+            elif evidence_type == 'browser_history':
+                print("Checking browser data collection consent...")
+            elif evidence_type == 'network_connections':
+                print("Collecting network connections...")
+            elif evidence_type == 'file_metadata':
+                print("Collecting file metadata...")
+            collector.collect()
+
+        chain_valid = self.storage.verify_full_hash_chain()
+        if not chain_valid:
+            print("CRITICAL: TAMPERING DETECTED AFTER COLLECTION!")
+            self.tampering_detected = True
+
+        expired_result = self.retention_engine.flag_expired_evidence()
+        if expired_result['flagged'] > 0:
+            print(f"Flagged {expired_result['flagged']} expired evidence items")
     
     def export_to_zip(self, export_dir):
         """Export all evidence to a ZIP file with checksum manifest - requires exporter role"""

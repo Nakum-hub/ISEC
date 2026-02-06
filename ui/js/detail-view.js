@@ -6,6 +6,13 @@ function getIsecBridge() {
   return window.isec;
 }
 
+let selectedEvidenceId = null;
+
+function setSelectedEvidenceId(recordId) {
+  selectedEvidenceId = recordId;
+  refreshDetailData();
+}
+
 async function initializeDetailView() {
   // Add tab listeners
   document.querySelectorAll('.tab-btn').forEach(tab => {
@@ -39,7 +46,47 @@ async function initializeDetailView() {
 }
 
 async function refreshDetailData() {
-  alert('Evidence detail refresh is not available in this build. Use Evidence Timeline for verified records.');
+  showLoading();
+
+  try {
+    const bridge = getIsecBridge();
+    if (!bridge) {
+      alert('Evidence detail refresh is not available in this environment.');
+      return;
+    }
+
+    const result = await bridge.invoke('get-evidence-detail', { recordId: selectedEvidenceId });
+    if (!result || !result.success || !result.item) {
+      const msg = (result && result.message) ? result.message : 'Unable to load evidence detail.';
+      console.error('Detail refresh failed:', msg);
+      alert(msg);
+      return;
+    }
+
+    const item = result.item;
+    const idEl = document.getElementById('evidence-id');
+    const typeEl = document.getElementById('evidence-type');
+    const tsEl = document.getElementById('evidence-timestamp');
+    const sizeEl = document.getElementById('evidence-size');
+    const hashEl = document.getElementById('evidence-hash');
+
+    if (idEl) idEl.textContent = item.id ? `#${item.id}` : 'N/A';
+    if (typeEl) typeEl.textContent = item.type ? item.type.replace(/_/g, ' ') : 'N/A';
+    if (tsEl) tsEl.textContent = item.timestamp ? formatDate(item.timestamp) : 'N/A';
+    if (sizeEl) {
+      const sizeBytes = (typeof item.sizeBytes === 'number') ? item.sizeBytes : null;
+      sizeEl.textContent = (sizeBytes !== null) ? formatFileSize(sizeBytes) : 'N/A';
+    }
+    if (hashEl) {
+      const hash = item.currentRecordHash || item.hmacSignature || 'N/A';
+      hashEl.textContent = hash;
+    }
+  } catch (error) {
+    console.error('Detail refresh error:', error);
+    alert('Evidence detail refresh failed: ' + error.message);
+  } finally {
+    hideLoading();
+  }
 }
 
 async function exportEvidence() {

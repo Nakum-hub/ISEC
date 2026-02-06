@@ -20,12 +20,21 @@ function initializeNavigation() {
       if (timelineSection) {
         timelineSection.classList.add('active');
       }
+      if (typeof loadTimelineData === 'function') {
+        const filterEl = document.getElementById('timeline-filter');
+        const activeFilter = filterEl ? filterEl.value : 'all';
+        loadTimelineData(activeFilter, { force: true });
+      }
       return;
     }
 
     const staticSection = document.getElementById(viewId);
     if (staticSection) {
       staticSection.classList.add('active');
+    }
+
+    if (viewId === 'detail' && typeof refreshDetailData === 'function') {
+      refreshDetailData();
     }
   }
 

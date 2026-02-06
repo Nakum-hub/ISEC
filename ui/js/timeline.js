@@ -10,13 +10,10 @@ function getIsecBridge() {
 let timelineRefreshTimer = null;
 
 async function initializeTimeline() {
-  // Load timeline data
-  loadTimelineData();
-
   const filterEl = document.getElementById('timeline-filter');
   if (filterEl) {
     filterEl.addEventListener('change', function() {
-      loadTimelineData(this.value);
+      loadTimelineData(this.value, { force: true });
     });
   }
 
@@ -28,9 +25,27 @@ async function initializeTimeline() {
   }
 }
 
-async function loadTimelineData(filter = 'all') {
+function isTimelineActive() {
+  const timelineSection = document.getElementById('timeline');
+  return !!(timelineSection && timelineSection.classList.contains('active'));
+}
+
+function renderTimelineLoading() {
+  const container = document.getElementById('timeline-items');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state">Loading evidence timeline...</div>';
+}
+
+async function loadTimelineData(filter = 'all', options = {}) {
+  const force = !!(options && options.force);
+  if (!force && !isTimelineActive()) {
+    return;
+  }
+
   try {
-    showLoading();
+    if (isTimelineActive()) {
+      renderTimelineLoading();
+    }
 
     const bridge = getIsecBridge();
     if (!bridge) {
@@ -61,8 +76,6 @@ async function loadTimelineData(filter = 'all') {
     renderTimeline(filteredData);
   } catch (error) {
     console.error('Error loading timeline data:', error);
-  } finally {
-    hideLoading();
   }
 }
 
@@ -97,6 +110,16 @@ function renderTimeline(timelineItems) {
         </div>
       </div>
     `;
+
+    timelineItem.addEventListener('click', () => {
+      if (typeof setSelectedEvidenceId === 'function') {
+        setSelectedEvidenceId(item.id);
+      }
+      const detailNav = document.querySelector('[data-view="detail"]');
+      if (detailNav) {
+        detailNav.click();
+      }
+    });
     
     container.appendChild(timelineItem);
   });

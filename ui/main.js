@@ -29,7 +29,6 @@ let pythonQueue = Promise.resolve();
 
 const pythonPath = 'python';
 const scriptPath = path.join(__dirname, '..', 'main.py');
-const evidenceDir = path.join(__dirname, '..', 'evidence_output');
 const roleFilePath = path.join(__dirname, '..', 'user_roles.encrypted');
 const licenseFilePath = path.join(__dirname, '..', 'license.json');
 const updatesDir = path.join(__dirname, '..', 'updates');
@@ -150,9 +149,29 @@ function applyBackendStatus(status) {
   }
 }
 
+function getStoragePaths() {
+  const baseDir = path.join(app.getPath('userData'), 'storage');
+  const evidenceDir = path.join(baseDir, 'evidence');
+  const reportsDir = path.join(baseDir, 'reports');
+  const exportsDir = path.join(baseDir, 'exports');
+
+  try {
+    fs.mkdirSync(evidenceDir, { recursive: true });
+    fs.mkdirSync(reportsDir, { recursive: true });
+    fs.mkdirSync(exportsDir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create storage directories:', err);
+  }
+
+  return { baseDir, evidenceDir, reportsDir, exportsDir };
+}
+
 function runPythonAction(action, extraArgs = []) {
   const task = () => new Promise((resolve, reject) => {
     pythonBusy = true;
+
+    const storagePaths = getStoragePaths();
+    const evidenceDir = storagePaths.evidenceDir;
 
     const defaultRoleArgs = fs.existsSync(roleFilePath) ? [] : ['--default-role', 'collector'];
     const licenseArgs = ['--license-file', licenseFilePath];
@@ -168,6 +187,11 @@ function runPythonAction(action, extraArgs = []) {
     };
     const timeoutMs = timeoutMsMap[action] || 30000;
 
+    const reportDirArgPresent = extraArgs.includes('--report-dir');
+    const reportArgs = (action === 'report' && !reportDirArgPresent)
+      ? ['--report-dir', storagePaths.reportsDir]
+      : [];
+
     const args = [
       scriptPath,
       '--output-dir',
@@ -178,6 +202,7 @@ function runPythonAction(action, extraArgs = []) {
       ...allowUnlicensedArgs,
       '--action',
       action,
+      ...reportArgs,
       ...extraArgs
     ];
     const proc = spawn(pythonPath, args, { cwd: path.join(__dirname, '..') });
@@ -359,6 +384,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
 
+    show: false,
     frame: false, // Custom window frame for modern look
     transparent: true, // Enable transparency for glass effect
     vibrancy: 'dark' // macOS vibrancy effect
@@ -367,6 +393,29 @@ function createWindow() {
   // Load the index.html file
   const indexPath = path.join(__dirname, 'index.html');
   mainWindow.loadFile(indexPath);
+
+  mainWindow.once('ready-to-show', () => {
+    try {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.center();
+    } catch (err) {
+      console.error('Failed to show main window:', err);
+    }
+  });
+
+  // Fallback: ensure the window is visible even if ready-to-show doesn't fire.
+  setTimeout(() => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.center();
+      }
+    } catch (err) {
+      console.error('Fallback show window failed:', err);
+    }
+  }, 1200);
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
@@ -502,7 +551,13 @@ ipcMain.handle('start-evidence-collection', async (event, options) => {
       return { success: false, message: 'Evidence collection locked due to tampering detection!', evidenceCount: 0, integrityStatus: 'LOCKED' };
     }
 
-    const res = await runPythonAction('collect');
+    const types = options && Array.isArray(options.types) ? options.types.map(String) : [];
+    const extraArgs = [];
+    if (types.length > 0) {
+      extraArgs.push('--collect-types', types.join(','));
+    }
+
+    const res = await runPythonAction('collect', extraArgs);
     const json = res.json;
 
     if (json && json.status) {
@@ -528,6 +583,34 @@ ipcMain.handle('start-evidence-collection', async (event, options) => {
   } catch (err) {
     console.error('start-evidence-collection failed:', err);
     return { success: false, message: err.message || 'Evidence collection failed.', evidenceCount: 0, integrityStatus: 'ERROR' };
+  }
+});
+
+ipcMain.handle('get-evidence-detail', async (event, options) => {
+  try {
+    await refreshBackendStatus();
+
+    if (!userPermissions.includes('view')) {
+      return { success: false, item: null, message: 'Permission denied: View role required.' };
+    }
+
+    const recordId = options && options.recordId ? String(options.recordId) : '';
+    const extraArgs = [];
+    if (recordId) {
+      extraArgs.push('--record-id', recordId);
+    }
+
+    const res = await runPythonAction('detail', extraArgs);
+    const json = res.json;
+
+    if (json && json.status) {
+      applyBackendStatus(json.status);
+    }
+
+    return json || { success: false, item: null, message: 'Failed to load evidence detail.' };
+  } catch (err) {
+    console.error('get-evidence-detail failed:', err);
+    return { success: false, item: null, message: err.message || 'Failed to load evidence detail.' };
   }
 });
 
@@ -638,7 +721,8 @@ ipcMain.handle('export-evidence', async (event, options) => {
       return { success: false, filePath: null, message: 'Export blocked: no evidence available.' };
     }
 
-    const exportDir = (options && options.exportDir) ? options.exportDir : app.getPath('documents');
+    const storagePaths = getStoragePaths();
+    const exportDir = (options && options.exportDir) ? options.exportDir : storagePaths.exportsDir;
     const res = await runPythonAction('export', ['--export-dir', exportDir]);
     const json = res.json;
     if (json && json.status) {

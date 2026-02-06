@@ -13,12 +13,12 @@ async function initializeDashboard() {
   // Add event listeners
   const collectBtn = document.getElementById('collect-btn');
   if (collectBtn) {
-    collectBtn.addEventListener('click', startEvidenceCollection);
+    collectBtn.addEventListener('click', () => startEvidenceCollection());
   }
-  
+
   // Add quick action buttons
   document.querySelectorAll('.action-btn[data-action]').forEach(btn => {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', function () {
       const action = this.getAttribute('data-action');
       performQuickAction(action);
     });
@@ -34,11 +34,6 @@ async function initializeDashboard() {
     applyUpdateBtn.addEventListener('click', applyUpdate);
   }
 
-  const switchRoleBtn = document.getElementById('switch-role-btn');
-  if (switchRoleBtn) {
-    switchRoleBtn.addEventListener('click', switchRole);
-  }
-
   if (!dashboardRefreshTimer) {
     dashboardRefreshTimer = setInterval(() => {
       loadDashboardStats();
@@ -46,6 +41,89 @@ async function initializeDashboard() {
   }
 
   checkForUpdates();
+}
+
+function openBrowserConsentModal() {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Browser History Consent</h3>
+          <button class="close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Browser history collection requires explicit consent.</p>
+          <div class="modal-field">
+            <label for="consent-time-range">Time range</label>
+            <select id="consent-time-range">
+              <option value="last_24h">Last 24 hours</option>
+              <option value="last_7d" selected>Last 7 days</option>
+              <option value="last_30d">Last 30 days</option>
+              <option value="all_time">All time</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label for="consent-browsers">Browsers (optional)</label>
+            <input id="consent-browsers" type="text" placeholder="Chrome, Firefox" />
+            <small class="modal-note">Leave blank to include all detected browsers.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" type="button" data-action="cancel">Skip</button>
+          <button class="btn btn-primary" type="button" data-action="confirm">Grant Consent</button>
+        </div>
+      </div>
+    `;
+
+    const closeModal = (result) => {
+      modal.classList.remove('show');
+      setTimeout(() => modal.remove(), 150);
+      resolve(result);
+    };
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        closeModal(null);
+      }
+    });
+
+    const closeBtn = modal.querySelector('.close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => closeModal(null));
+    }
+
+    const cancelBtn = modal.querySelector('[data-action="cancel"]');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => closeModal(null));
+    }
+
+    const confirmBtn = modal.querySelector('[data-action="confirm"]');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        const timeRangeEl = modal.querySelector('#consent-time-range');
+        const browsersEl = modal.querySelector('#consent-browsers');
+        const timeRange = timeRangeEl ? timeRangeEl.value : '';
+        const browsersRaw = browsersEl ? String(browsersEl.value || '') : '';
+        const browsers = browsersRaw
+          .split(',')
+          .map((b) => b.trim())
+          .filter(Boolean);
+
+        if (!timeRange) {
+          alert('Please select a time range.');
+          return;
+        }
+        closeModal({ timeRange, browsers });
+      });
+    }
+
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
+  });
 }
 
 async function loadDashboardStats() {
@@ -62,15 +140,25 @@ async function loadDashboardStats() {
     const totalEvidence = status && typeof status.evidenceItemsCount === 'number'
       ? status.evidenceItemsCount
       : (retention && typeof retention.total_evidence === 'number' ? retention.total_evidence : 0);
-    document.getElementById('total-evidence').textContent = String(totalEvidence);
-    document.getElementById('integrity-status').textContent = integrity && integrity.status ? integrity.status : 'unknown';
-    document.getElementById('last-collect').textContent = 'N/A';
-    document.getElementById('reports-count').textContent = 'N/A';
+
+    // Safety check for elements before updating
+    const totalEl = document.getElementById('total-evidence');
+    if (totalEl) totalEl.textContent = String(totalEvidence);
+
+    const integrityEl = document.getElementById('integrity-status');
+    if (integrityEl) integrityEl.textContent = integrity && integrity.status ? integrity.status : 'unknown';
+
+    const lastCollectEl = document.getElementById('last-collect');
+    if (lastCollectEl && lastCollectEl.textContent === 'Never' && totalEvidence > 0) {
+      lastCollectEl.textContent = 'Recently';
+    }
+
+    const reportEl = document.getElementById('reports-count');
+    if (reportEl) reportEl.textContent = 'N/A'; // Placeholder
 
     const license = status && status.license ? status.license : null;
     updateLicenseUI(license);
     updatePermissionUI(status);
-    updateRoleSwitcher(status);
   } catch (error) {
     console.error('Error loading dashboard stats:', error);
   }
@@ -97,99 +185,47 @@ function updateLicenseUI(license) {
 
 function updatePermissionUI(status) {
   const collectBtn = document.getElementById('collect-btn');
-  if (!collectBtn || !status) {
-    return;
-  }
+  const actionBtns = document.querySelectorAll('.action-btn');
+
+  if (!status) return;
 
   const permissions = Array.isArray(status.permissions) ? status.permissions : [];
   const canCollect = permissions.includes('collect');
   const tampered = !!status.tamperingDetected;
   const licenseValid = status.license ? !!status.license.valid : true;
 
-  collectBtn.disabled = !canCollect || tampered || !licenseValid;
+  const disabledState = !canCollect || tampered || !licenseValid;
+  let titleText = '';
 
   if (!licenseValid) {
-    collectBtn.title = (status.license && status.license.message) ? status.license.message : 'Valid license required';
+    titleText = (status.license && status.license.message) ? status.license.message : 'Valid license required';
   } else if (tampered) {
-    collectBtn.title = 'Evidence collection locked due to tampering detection.';
+    titleText = 'Evidence collection locked due to tampering detection.';
   } else if (!canCollect) {
-    collectBtn.title = 'Collector role required to collect evidence.';
-  } else {
-    collectBtn.title = '';
-  }
-}
-
-function updateRoleSwitcher(status) {
-  const roleLabel = document.getElementById('current-role-label');
-  const roleSelect = document.getElementById('role-select');
-  const switchBtn = document.getElementById('switch-role-btn');
-
-  if (!roleLabel || !roleSelect || !switchBtn || !status) {
-    return;
+    titleText = 'Collector role required to collect evidence.';
   }
 
-  const currentRole = status.role || 'unknown';
-  roleLabel.textContent = `Current role: ${currentRole}`;
-  if (roleSelect.value !== currentRole && ['collector', 'reviewer', 'exporter'].includes(currentRole)) {
-    roleSelect.value = currentRole;
+  if (collectBtn) {
+    collectBtn.disabled = disabledState;
+    if (titleText) collectBtn.title = titleText;
   }
 
-  if (status.tamperingDetected) {
-    switchBtn.disabled = true;
-    switchBtn.title = 'Role switching is blocked due to tampering detection.';
-  } else {
-    switchBtn.disabled = false;
-    switchBtn.title = '';
-  }
-}
+  actionBtns.forEach(btn => {
+    btn.disabled = disabledState;
+    if (titleText) btn.title = titleText;
 
-async function switchRole() {
-  const bridge = getIsecBridge();
-  if (!bridge) {
-    alert('Role switching is not available in this environment.');
-    return;
-  }
-
-  const roleSelect = document.getElementById('role-select');
-  if (!roleSelect) {
-    return;
-  }
-
-  const targetRole = String(roleSelect.value || '').toLowerCase();
-  if (!['collector', 'reviewer', 'exporter'].includes(targetRole)) {
-    alert('Invalid role selection.');
-    return;
-  }
-
-  const confirmSwitch = confirm(`Switch role to ${targetRole}? This action is logged.`);
-  if (!confirmSwitch) {
-    return;
-  }
-
-  try {
-    const result = await bridge.invoke('set-user-role', targetRole);
-    if (result && result.success) {
-      const status = result.status || null;
-      if (status) {
-        updatePermissionUI(status);
-        updateRoleSwitcher(status);
-      }
-      if (typeof refreshDetailPermissions === 'function') {
-        refreshDetailPermissions().catch(() => {});
-      }
-      if (typeof refreshReportPermissions === 'function') {
-        refreshReportPermissions().catch(() => {});
-      }
-      alert(result.message || 'Role updated.');
-      loadDashboardStats();
+    // Visual feedback for disabled state
+    if (disabledState) {
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
     } else {
-      alert((result && result.message) ? result.message : 'Role change failed.');
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
     }
-  } catch (error) {
-    console.error('Role switch failed:', error);
-    alert('Role change failed: ' + error.message);
-  }
+  });
 }
+
+// Role logic moved to role-manager.js
 
 async function checkForUpdates() {
   try {
@@ -232,14 +268,16 @@ async function applyUpdate() {
   }
 }
 
-async function startEvidenceCollection() {
+async function startEvidenceCollection(options = {}) {
   const bridge = getIsecBridge();
   if (!bridge) {
     console.error('Dashboard: Cannot start evidence collection, IPC not available');
     alert('Evidence collection is not available in this environment.');
     return;
   }
-  
+
+  const collectTypes = Array.isArray(options.types) && options.types.length > 0 ? options.types : null;
+
   try {
     const backendStatus = await bridge.invoke('get-backend-status');
     if (backendStatus && backendStatus.license && !backendStatus.license.valid) {
@@ -247,41 +285,23 @@ async function startEvidenceCollection() {
       return;
     }
     const consent = backendStatus && backendStatus.browserConsent ? backendStatus.browserConsent : null;
-    if (consent && (consent.status === 'PENDING' || consent.status === 'EXPIRED')) {
-      const wantConsent = confirm('Browser history collection requires consent. Do you want to grant consent now?');
-      if (wantConsent) {
-        const timeChoice = prompt(
-          'Select browser history time range:\n1. Last 24 hours\n2. Last 7 days\n3. Last 30 days\n4. All time',
-          '2'
-        );
-
-        const timeMap = {
-          '1': 'last_24h',
-          '2': 'last_7d',
-          '3': 'last_30d',
-          '4': 'all_time'
-        };
-        const timeRange = timeMap[String(timeChoice || '').trim()];
-        if (!timeRange) {
-          alert('Browser consent not updated: invalid time range selection.');
-        } else {
-          const browsersInput = prompt('Optional: Enter browsers to scan (comma-separated) or leave blank for all:', '');
-          const browsers = String(browsersInput || '')
-            .split(',')
-            .map((b) => b.trim())
-            .filter(Boolean);
-
-          const consentResult = await bridge.invoke('set-browser-consent', { timeRange, browsers });
-          if (!consentResult || !consentResult.success) {
-            alert((consentResult && consentResult.message) ? consentResult.message : 'Failed to update browser consent.');
-          }
+    const needsBrowserConsent = !collectTypes || collectTypes.includes('browser_history');
+    if (needsBrowserConsent && consent && (consent.status === 'PENDING' || consent.status === 'EXPIRED')) {
+      const consentInput = await openBrowserConsentModal();
+      if (consentInput && consentInput.timeRange) {
+        const consentResult = await bridge.invoke('set-browser-consent', {
+          timeRange: consentInput.timeRange,
+          browsers: consentInput.browsers || []
+        });
+        if (!consentResult || !consentResult.success) {
+          alert((consentResult && consentResult.message) ? consentResult.message : 'Failed to update browser consent.');
         }
       }
     }
 
     showLoading();
-    const result = await bridge.invoke('start-evidence-collection', {});
-    
+    const result = await bridge.invoke('start-evidence-collection', { types: collectTypes || [] });
+
     if (result.success) {
       // Update dashboard stats
       document.getElementById('total-evidence').textContent = result.evidenceCount;
@@ -294,7 +314,7 @@ async function startEvidenceCollection() {
           reportsEl.textContent = String(current + 1);
         }
       }
-      
+
       alert('Evidence collection completed successfully!');
     } else {
       // Show a clear message when collection is denied or blocked
@@ -309,5 +329,23 @@ async function startEvidenceCollection() {
 }
 
 function performQuickAction(action) {
-  alert('Quick actions are not available in this build. Use Collect Evidence for verified collection.');
+  const labels = {
+    'system-logs': 'System Logs',
+    'browser-history': 'Browser History',
+    'network-connections': 'Network Connections',
+    'file-metadata': 'File Metadata'
+  };
+  const label = labels[action] || 'Evidence';
+  const typeMap = {
+    'system-logs': 'system_logs',
+    'browser-history': 'browser_history',
+    'network-connections': 'network_connections',
+    'file-metadata': 'file_metadata'
+  };
+  const type = typeMap[action];
+
+  if (confirm(`Start secure evidence collection for ${label}?`)) {
+    const types = type ? [type] : [];
+    startEvidenceCollection({ types });
+  }
 }

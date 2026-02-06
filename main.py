@@ -301,14 +301,17 @@ def main():
     parser.add_argument('--allow-unlicensed', action='store_true', help='Allow running without a valid license (development only)')
     parser.add_argument('--no-report', action='store_true', help='Skip PDF report generation')
     parser.add_argument('--export-dir', help='Directory to export evidence as ZIP')
+    parser.add_argument('--report-dir', help='Directory to store generated reports')
     parser.add_argument('--assign-role', action='store_true', help='Assign user role interactively')
     parser.add_argument('--set-retention', action='store_true', help='Set evidence retention policy interactively')
     parser.add_argument('--electron-mode', action='store_true', help='Run in non-interactive mode for Electron UI')
     parser.add_argument('--default-role', choices=['collector', 'reviewer', 'exporter'], help='Default user role when initializing role manager')
-    parser.add_argument('--action', choices=['run', 'status', 'timeline', 'collect', 'report', 'export', 'set_browser_consent', 'set_role'], default='run', help='Internal action for Electron IPC')
+    parser.add_argument('--action', choices=['run', 'status', 'timeline', 'collect', 'report', 'export', 'detail', 'set_browser_consent', 'set_role'], default='run', help='Internal action for Electron IPC')
     parser.add_argument('--consent-time-range', choices=['last_24h', 'last_7d', 'last_30d', 'all_time'], help='Time range for browser history consent (Electron action)')
     parser.add_argument('--consent-browsers', help='Comma-separated list of browsers to scan (Electron action)')
+    parser.add_argument('--collect-types', help='Comma-separated evidence types to collect (system_logs,browser_history,network_connections,file_metadata)')
     parser.add_argument('--role', choices=['collector', 'reviewer', 'exporter'], help='Role to set (set_role action)')
+    parser.add_argument('--record-id', type=int, help='Evidence record ID for detail action')
     
     args = parser.parse_args()
 
@@ -490,6 +493,54 @@ def main():
             "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
         })
         return
+    if args.action == 'detail':
+        status_payload = build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
+        if not license_allows('view'):
+            emit_json({
+                "success": False,
+                "message": "Evidence detail blocked: valid license required.",
+                "item": None,
+                "status": status_payload
+            })
+            return
+        if not collector.role_manager.has_permission('view'):
+            emit_json({
+                "success": False,
+                "message": "Evidence detail blocked: insufficient permissions.",
+                "item": None,
+                "status": status_payload
+            })
+            return
+
+        record_id = args.record_id
+        if record_id is None:
+            rows = collector.storage.get_all_evidence()
+            if not rows:
+                emit_json({
+                    "success": False,
+                    "message": "Evidence detail unavailable: no evidence available.",
+                    "item": None,
+                    "status": status_payload
+                })
+                return
+            record_id = rows[0][0]
+
+        detail = collector.storage.get_evidence_detail(record_id)
+        if not detail:
+            emit_json({
+                "success": False,
+                "message": "Evidence detail not found.",
+                "item": None,
+                "status": status_payload
+            })
+            return
+
+        emit_json({
+            "success": True,
+            "item": detail,
+            "status": status_payload
+        })
+        return
     if args.action == 'collect':
         if not license_allows('collect'):
             emit_json({
@@ -505,7 +556,27 @@ def main():
                 "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
             })
             return
-        collector.collect_all_evidence()
+
+        collect_types = []
+        if args.collect_types:
+            requested = [t.strip() for t in args.collect_types.split(',') if t.strip()]
+            # Deduplicate while preserving order
+            seen = set()
+            requested = [t for t in requested if not (t in seen or seen.add(t))]
+            invalid = [t for t in requested if t not in EVIDENCE_TYPES]
+            if invalid:
+                emit_json({
+                    "success": False,
+                    "message": f"Evidence collection blocked: invalid evidence type(s): {', '.join(invalid)}",
+                    "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
+                })
+                return
+            collect_types = requested
+
+        if collect_types:
+            collector.collect_selected_evidence(collect_types)
+        else:
+            collector.collect_all_evidence()
         emit_json({
             "success": True,
             "message": "Evidence collection completed.",
@@ -529,7 +600,9 @@ def main():
         if not status_payload.get('hashChainValid', True):
             emit_json({"success": False, "message": "Report generation blocked: integrity verification failed.", "filePath": None, "status": status_payload})
             return
-        report_gen = ReportGenerator(collector.storage, collector.output_dir)
+        report_dir = args.report_dir or collector.output_dir
+        os.makedirs(report_dir, exist_ok=True)
+        report_gen = ReportGenerator(collector.storage, report_dir)
         report_path = report_gen.generate_signed_report()
         emit_json({"success": True, "filePath": report_path, "status": build_status_payload(collector)})
         return
@@ -608,6 +681,14 @@ def main():
                 print("Current role does not have permission to collect evidence, so consent request is skipped.")
         else:
             print(f"Browser data collection consent issue: {collector.browser_consent_status.get('message', 'Unknown issue')}")
+
+    # In Electron mode, do not run automatic collection/report/export.
+    # The UI triggers these actions explicitly via IPC.
+    if args.electron_mode:
+        print("\nElectron mode detected: automatic collection, report generation, and export are disabled.")
+        print("Use the UI controls to start evidence collection or generate outputs.")
+        print("\nProcess completed.")
+        return
     
     # Perform evidence collection if permitted
     if not license_allows('collect'):
@@ -622,7 +703,9 @@ def main():
     # Generate report if not skipped and user has view permission
     if not args.no_report and collector.role_manager.has_permission('view') and license_allows('report'):
         print("\nGenerating forensic report...")
-        report_gen = ReportGenerator(collector.storage, collector.output_dir)
+        report_dir = args.report_dir or collector.output_dir
+        os.makedirs(report_dir, exist_ok=True)
+        report_gen = ReportGenerator(collector.storage, report_dir)
         report_path = report_gen.generate_signed_report()
         print(f"Report generated: {report_path}")
     elif not license_allows('report') and not args.no_report:

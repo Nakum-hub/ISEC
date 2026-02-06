@@ -4,7 +4,7 @@
   "description": "Internal Security Evidence Collector - Desktop Application",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/run-electron.js",
     "build": "electron-builder"
   },
   "keywords": [

@@ -370,3 +370,52 @@ class EvidenceDatabase:
                 return json.loads(decrypted_data)
             except Exception:
                 return None  # Return None if decryption fails
+
+    def get_evidence_detail(self, record_id):
+        """Return a detailed evidence record for UI display."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address,
+                       retention_status, chain_verification_result, prev_record_hash,
+                       current_record_hash, hmac_signature, data
+                FROM evidence
+                WHERE id = ?
+            ''', (record_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+        (rec_id, evidence_type, timestamp, actor, workstation_id, ip_address,
+         retention_status, chain_verification_result, prev_record_hash,
+         current_record_hash, hmac_signature, encrypted_data) = row
+
+        payload = None
+        size_bytes = None
+        try:
+            payload = self.decrypt_evidence_data(rec_id)
+            if payload is not None:
+                size_bytes = len(json.dumps(payload).encode('utf-8'))
+        except Exception:
+            payload = None
+            size_bytes = None
+
+        integrity_ok = self.verify_integrity(rec_id)
+
+        return {
+            'id': rec_id,
+            'type': evidence_type,
+            'timestamp': timestamp,
+            'actor': actor,
+            'workstationId': workstation_id,
+            'ipAddress': ip_address,
+            'retentionStatus': retention_status,
+            'chainVerificationResult': chain_verification_result,
+            'prevRecordHash': prev_record_hash,
+            'currentRecordHash': current_record_hash,
+            'hmacSignature': hmac_signature,
+            'data': payload.get('data') if isinstance(payload, dict) else None,
+            'additionalFields': payload.get('additional_fields') if isinstance(payload, dict) else None,
+            'sizeBytes': size_bytes,
+            'integrityOk': integrity_ok
+        }

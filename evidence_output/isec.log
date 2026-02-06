@@ -349,3 +349,315 @@ Startup check - output_dir_exists: OK
 Startup check - output_dir_writable: OK
 Startup check - database_accessible: OK
 Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:02,711 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:27,150 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:30,387 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:32,883 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:45,080 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:54,412 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:30:57,337 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:31:21,675 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:31:32,682 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:31:44,522 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:00,334 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:05,295 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:07,393 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:21,497 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:34,049 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:37,602 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:32:47,531 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 22:33:17,569 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Traceback (most recent call last):
+  File "C:\app\ISEC\main.py", line 653, in <module>
+    main()
+  File "C:\app\ISEC\main.py", line 381, in main
+    emit_json(build_timeline_payload(collector))
+  File "C:\app\ISEC\main.py", line 221, in emit_json
+    out.flush()
+OSError: [Errno 22] Invalid argument
+2026-02-04 23:18:19,595 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:18:24,554 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:18:38,375 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:18:43,266 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:18:50,593 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:18:54,992 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:05,384 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:08,346 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:19,929 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:24,710 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:35,033 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:38,726 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:50,000 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:19:54,278 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:20:05,240 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:20:10,043 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:38:53,560 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:39:11,423 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:39:42,282 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:39:57,738 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:40:40,222 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-04 23:40:54,632 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-04 23:41:09,601 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:41:22,903 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+2026-02-04 23:41:35,028 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-04 23:43:26,680 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-04 23:45:14,915 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-04 23:48:42,612 [INFO] src.utils.logging_setup: Logging initialized: evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:13:15,226 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:13:37,532 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:13:39,568 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:13:41,403 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:13:46,717 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:14:25,778 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:14:33,841 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:14:35,223 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:14:36,641 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-02-05 08:14:51,313 [INFO] src.utils.logging_setup: Logging initialized: C:\app\ISEC\evidence_output\isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Browser history collection requires explicit consent. Collection will be skipped.
+Traceback (most recent call last):
+  File "C:\app\ISEC\main.py", line 661, in <module>
+    main()
+  File "C:\app\ISEC\main.py", line 370, in main
+    emit_json(build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect')))
+  File "C:\app\ISEC\main.py", line 221, in emit_json
+    out.flush()
+OSError: [Errno 22] Invalid argument

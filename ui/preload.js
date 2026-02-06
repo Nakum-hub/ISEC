@@ -8,6 +8,7 @@ const allowedInvokeChannels = new Set([
   'get-backend-status',
   'set-browser-consent',
   'start-evidence-collection',
+  'get-evidence-detail',
   'get-evidence-timeline',
   'generate-report',
   'export-evidence',
