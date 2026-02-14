@@ -2,3 +2,6 @@
 PyPDF2==2.12.1
 reportlab==4.0.4
 cryptography==41.0.7
+cffi==1.17.1
+pycparser==2.22
+Pillow==10.1.0

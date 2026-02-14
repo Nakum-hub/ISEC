@@ -5,7 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "node scripts/run-electron.js",
-    "build": "electron-builder"
+    "build": "python ../scripts/release_build.py --ui-dir . --dist-dir dist --manifest ../build_manifest.json --skip-npm-ci",
+    "build:manifest": "python ../scripts/create_build_manifest.py --dist-dir dist --output ../build_manifest.json --project-root .. --require-signed",
+    "build:release": "python ../scripts/release_build.py --ui-dir . --dist-dir dist --manifest ../build_manifest.json --skip-npm-ci"
   },
   "keywords": [
     "cybersecurity",
@@ -23,6 +25,35 @@
       "buildResources": "assets",
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "../main.py",
+        "to": "backend/main.py"
+      },
+      {
+        "from": "../src",
+        "to": "backend/src"
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "backend/requirements.txt"
+      },
+      {
+        "from": "../security_config.py",
+        "to": "backend/security_config.py"
+      },
+      {
+        "from": "../scripts",
+        "to": "backend/scripts"
+      },
+      {
+        "from": "../keys",
+        "to": "keys",
+        "filter": [
+          "license_public_key.pem"
+        ]
+      }
+    ],
     "files": [
       "**/*"
     ],
@@ -30,9 +61,7 @@
     "win": {
       "target": [
         "nsis"
-      ],
-      "certificateFile": "${env.WIN_CERT_FILE}",
-      "certificatePassword": "${env.WIN_CERT_PASSWORD}"
+      ]
     },
     "mac": {
       "target": [

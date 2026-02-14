@@ -9,12 +9,7 @@ function getIsecInvoker() {
     if (typeof window !== 'undefined' && window.isec && typeof window.isec.invoke === 'function') {
         return window.isec.invoke.bind(window.isec);
     }
-    try {
-        const { ipcRenderer } = require('electron');
-        return ipcRenderer.invoke.bind(ipcRenderer);
-    } catch (error) {
-        return null;
-    }
+    return null;
 }
 
 async function invokeIsec(channel, ...args) {
@@ -187,11 +182,16 @@ async function loadEvidenceCounts() {
         const total = (status && typeof status.evidenceItemsCount === 'number') ? status.evidenceItemsCount : 0;
         
         // Update dashboard counters
-        document.getElementById('total-evidence-count')?.textContent = total || 0;
-        document.getElementById('system-logs-count')?.textContent = counts.system_logs || 0;
-        document.getElementById('browser-history-count')?.textContent = counts.browser_history || 0;
-        document.getElementById('network-connections-count')?.textContent = counts.network_connections || 0;
-        document.getElementById('file-metadata-count')?.textContent = counts.file_metadata || 0;
+        const totalEl = document.getElementById('total-evidence-count');
+        if (totalEl) totalEl.textContent = String(total || 0);
+        const systemLogsEl = document.getElementById('system-logs-count');
+        if (systemLogsEl) systemLogsEl.textContent = String(counts.system_logs || 0);
+        const browserHistoryEl = document.getElementById('browser-history-count');
+        if (browserHistoryEl) browserHistoryEl.textContent = String(counts.browser_history || 0);
+        const networkConnectionsEl = document.getElementById('network-connections-count');
+        if (networkConnectionsEl) networkConnectionsEl.textContent = String(counts.network_connections || 0);
+        const fileMetadataEl = document.getElementById('file-metadata-count');
+        if (fileMetadataEl) fileMetadataEl.textContent = String(counts.file_metadata || 0);
         
         // Update confidence meter based on evidence quality
         updateConfidenceMeter();

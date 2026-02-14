@@ -6,14 +6,17 @@ import argparse
 import json
 import os
 import sys
-from src.core.collector import EvidenceCollector
-from src.reporting.report_generator import ReportGenerator
 from src.utils.consent_manager import get_consent_manager
 from src.utils.role_manager import get_role_manager, UserRole
 from src.utils.retention_engine import RetentionPolicy
 from src.utils.startup_validator import validate_environment
 from src.utils.license_manager import LicenseManager
 from src.utils.logging_setup import setup_logging
+from src.utils.runtime_config import (
+    build_runtime_config,
+    validate_runtime_config,
+    is_production_runtime,
+)
 
 ACTION_STDOUT = None
 EVIDENCE_TYPES = {
@@ -22,6 +25,120 @@ EVIDENCE_TYPES = {
     'network_connections',
     'file_metadata'
 }
+ACTION_FEATURE_REQUIREMENTS = {
+    'timeline': {'view'},
+    'detail': {'view'},
+    'set_role': {'view'},
+    'set_browser_consent': {'collect'},
+    'collect': {'collect'},
+    'report': {'view', 'report'},
+    'export': {'view', 'export'},
+}
+
+
+def build_minimal_status_payload(license_status, message):
+    return {
+        "success": False,
+        "role": "unknown",
+        "roleName": "Unavailable",
+        "permissions": [],
+        "roleAuthRequired": True,
+        "roleAuthConfigured": False,
+        "tamperingDetected": False,
+        "collectionAllowed": False,
+        "browserConsent": {},
+        "retention": {},
+        "evidenceCount": 0,
+        "evidenceItemsCount": 0,
+        "evidenceTypeCounts": {},
+        "hashChainValid": False,
+        "license": license_status or {},
+        "message": message,
+    }
+
+
+def bootstrap_security(args, runtime_config):
+    if args.state_dir:
+        os.environ['ISEC_STATE_DIR'] = args.state_dir
+        try:
+            os.makedirs(args.state_dir, exist_ok=True)
+        except Exception:
+            pass
+
+    runtime_failures = validate_runtime_config(args, runtime_config)
+    if runtime_failures:
+        checks = []
+        for message in runtime_failures:
+            checks.append({
+                "name": "runtime_config",
+                "success": False,
+                "message": message
+            })
+        for check in checks:
+            print(f"Startup check - {check['name']}: FAILED - {check['message']}")
+        return {
+            "success": False,
+            "checks": checks,
+            "hard_failures": runtime_failures
+        }
+
+    log_path = None
+    if not args.no_log_file:
+        log_path = args.log_file or os.path.join(args.output_dir, 'isec.log')
+    setup_logging(log_path, args.log_level)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+    validation_result = validate_environment(args.output_dir)
+    for check in validation_result["checks"]:
+        status = "OK" if check["success"] else "FAILED"
+        if check["message"]:
+            print(f"Startup check - {check['name']}: {status} - {check['message']}")
+        else:
+            print(f"Startup check - {check['name']}: {status}")
+
+    hard_failures = []
+    if runtime_config.is_production and not validation_result["success"]:
+        hard_failures.append("Production startup blocked due to failed startup environment checks.")
+
+    if not validation_result["success"]:
+        print("Warning: One or more startup checks failed. The application will attempt to continue, but behavior may be degraded.")
+    return {
+        "success": validation_result.get("success", False),
+        "checks": validation_result.get("checks", []),
+        "hard_failures": hard_failures
+    }
+
+
+def verify_license(args):
+    license_manager = LicenseManager(license_file=args.license_file)
+    return license_manager.get_status()
+
+
+def load_feature_flags(license_status):
+    if not license_status or not license_status.get("valid"):
+        return {
+            "collect": False,
+            "view": False,
+            "report": False,
+            "export": False,
+            "all": False,
+        }
+
+    features = set(license_status.get("features") or [])
+    all_enabled = "all" in features
+    return {
+        "collect": all_enabled or "collect" in features,
+        "view": all_enabled or "view" in features,
+        "report": all_enabled or "report" in features,
+        "export": all_enabled or "export" in features,
+        "all": all_enabled,
+    }
+
+
+def check_action_feature_access(action, feature_flags):
+    required = ACTION_FEATURE_REQUIREMENTS.get(action, set())
+    missing = [name for name in required if not feature_flags.get(name, False)]
+    return len(missing) == 0, missing
 
 def request_browser_consent(collector):
     """Request consent for browser data collection"""
@@ -134,8 +251,14 @@ def assign_role(collector):
         except KeyboardInterrupt:
             print("\nRole assignment cancelled.")
             return
-    
-    success = role_manager.set_role(role)
+
+    auth_token = input("Enter admin token to authorize role assignment: ").strip()
+    auth_ok, auth_message = role_manager.authorize_role_change(auth_token)
+    if not auth_ok:
+        print(auth_message)
+        return
+
+    success = role_manager.set_role(role, assigned_by='admin_token')
     if success:
         print(f"Role '{role.value}' assigned successfully.")
         current_role = role_manager.get_role_description()
@@ -223,6 +346,7 @@ def emit_json(payload):
 
 def build_status_payload(collector, license_status=None, license_allowed_collect=True):
     current_role = collector.role_manager.get_role_description()
+    role_auth = collector.role_manager.get_role_auth_status() if hasattr(collector.role_manager, 'get_role_auth_status') else {}
     retention_status = collector.get_retention_status()
     evidence_count = 0
     evidence_type_counts = {}
@@ -243,6 +367,8 @@ def build_status_payload(collector, license_status=None, license_allowed_collect
         "role": current_role.get('role'),
         "roleName": current_role.get('name'),
         "permissions": current_role.get('permissions', []),
+        "roleAuthRequired": bool(role_auth.get("required", True)),
+        "roleAuthConfigured": bool(role_auth.get("configured", False)),
         "tamperingDetected": collector.tampering_detected,
         "collectionAllowed": collector.role_manager.has_permission('collect') and not collector.tampering_detected and license_allowed_collect,
         "browserConsent": collector.browser_consent_status,
@@ -291,27 +417,47 @@ def build_timeline_payload(collector):
         return {"success": False, "items": [], "message": str(exc)}
 
 
+def initialize_modules(args, feature_flags):
+    from src.core.collector import EvidenceCollector
+
+    modules = {
+        "collector": EvidenceCollector(
+            args.output_dir,
+            update_chain_results=(args.action == 'run'),
+            collect_enabled=feature_flags.get('collect', False),
+        ),
+        "ReportGenerator": None,
+    }
+
+    if feature_flags.get('report', False):
+        from src.reporting.report_generator import ReportGenerator
+        modules["ReportGenerator"] = ReportGenerator
+
+    return modules
+
+
 def main():
     parser = argparse.ArgumentParser(description='Internal Security Evidence Collector')
+    parser.add_argument('--env', default=os.environ.get('ISEC_ENV', 'development'), help='Runtime environment (development|testing|production)')
     parser.add_argument('--output-dir', default='evidence_output', help='Directory to store evidence database')
     parser.add_argument('--log-file', help='Path to log file (default: <output-dir>/isec.log)')
     parser.add_argument('--log-level', default='INFO', help='Logging level (default: INFO)')
     parser.add_argument('--no-log-file', action='store_true', help='Disable file logging')
     parser.add_argument('--license-file', help='Path to license file (default: license.json)')
-    parser.add_argument('--allow-unlicensed', action='store_true', help='Allow running without a valid license (development only)')
     parser.add_argument('--no-report', action='store_true', help='Skip PDF report generation')
     parser.add_argument('--export-dir', help='Directory to export evidence as ZIP')
     parser.add_argument('--report-dir', help='Directory to store generated reports')
     parser.add_argument('--assign-role', action='store_true', help='Assign user role interactively')
     parser.add_argument('--set-retention', action='store_true', help='Set evidence retention policy interactively')
     parser.add_argument('--electron-mode', action='store_true', help='Run in non-interactive mode for Electron UI')
-    parser.add_argument('--default-role', choices=['collector', 'reviewer', 'exporter'], help='Default user role when initializing role manager')
     parser.add_argument('--action', choices=['run', 'status', 'timeline', 'collect', 'report', 'export', 'detail', 'set_browser_consent', 'set_role'], default='run', help='Internal action for Electron IPC')
     parser.add_argument('--consent-time-range', choices=['last_24h', 'last_7d', 'last_30d', 'all_time'], help='Time range for browser history consent (Electron action)')
     parser.add_argument('--consent-browsers', help='Comma-separated list of browsers to scan (Electron action)')
     parser.add_argument('--collect-types', help='Comma-separated evidence types to collect (system_logs,browser_history,network_connections,file_metadata)')
     parser.add_argument('--role', choices=['collector', 'reviewer', 'exporter'], help='Role to set (set_role action)')
+    parser.add_argument('--role-auth-token', help='Admin token required for set_role action')
     parser.add_argument('--record-id', type=int, help='Evidence record ID for detail action')
+    parser.add_argument('--state-dir', help='Directory for local state (roles, consents, keys)')
     
     args = parser.parse_args()
 
@@ -320,23 +466,32 @@ def main():
         ACTION_STDOUT = sys.stdout
         sys.stdout = sys.stderr
 
-    log_path = None
-    if not args.no_log_file:
-        log_path = args.log_file or os.path.join(args.output_dir, 'isec.log')
-    setup_logging(log_path, args.log_level)
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(args.output_dir, exist_ok=True)
+    try:
+        runtime_config = build_runtime_config(args.env)
+    except ValueError as exc:
+        message = f"Startup validation failed: {exc}"
+        if args.action != 'run':
+            emit_json({
+                'success': False,
+                'message': message
+            })
+            return
+        print(message)
+        return
 
-    validation_result = validate_environment(args.output_dir)
-    for check in validation_result["checks"]:
-        status = "OK" if check["success"] else "FAILED"
-        if check["message"]:
-            print(f"Startup check - {check['name']}: {status} - {check['message']}")
-        else:
-            print(f"Startup check - {check['name']}: {status}")
-    if not validation_result["success"]:
-        print("Warning: One or more startup checks failed. The application will attempt to continue, but behavior may be degraded.")
+    validation_result = bootstrap_security(args, runtime_config)
+    hard_failures = validation_result.get("hard_failures", [])
+    if hard_failures:
+        message = "Startup validation failed. " + " ".join(hard_failures)
+        if args.action != 'run':
+            emit_json({
+                'success': False,
+                'message': message,
+                'checks': validation_result.get('checks', [])
+            })
+            return
+        print(message)
+        return
 
     if args.action != 'run':
         critical_failures = [c for c in validation_result.get('checks', []) if c.get('name') in ('output_dir_writable', 'database_accessible') and not c.get('success')]
@@ -348,27 +503,60 @@ def main():
             })
             return
 
-    # License enforcement (offline)
-    license_manager = LicenseManager(license_file=args.license_file, allow_unlicensed=args.allow_unlicensed)
-    license_status = license_manager.get_status()
+    license_status = verify_license(args)
+    feature_flags = load_feature_flags(license_status)
 
     def license_allows(action_name):
-        return license_manager.allows(action_name)
+        if not action_name:
+            return False
+        return feature_flags.get(str(action_name).strip().lower(), False)
 
-    # Map default role CLI argument to UserRole enum if provided
-    default_role_enum = None
-    if args.default_role:
-        role_map = {
-            'collector': UserRole.COLLECTOR,
-            'reviewer': UserRole.REVIEWER,
-            'exporter': UserRole.EXPORTER
-        }
-        default_role_enum = role_map.get(args.default_role)
+    if not license_status.get("valid"):
+        message = license_status.get("message") or "License verification failed."
+        status_payload = build_minimal_status_payload(license_status, message)
+        if args.action == 'status':
+            status_payload["success"] = True
+            emit_json(status_payload)
+            return
+        if args.action != 'run':
+            emit_json({
+                "success": False,
+                "message": message,
+                "status": status_payload
+            })
+            return
+        print(f"\nLicense verification failed: {message}")
+        print("Execution halted. Provide a valid signed license file.")
+        return
 
-    # Initialize collector
-    update_chain_results = (args.action == 'run')
-    collector = EvidenceCollector(args.output_dir, default_role=default_role_enum, update_chain_results=update_chain_results)
-    
+    action_allowed, missing_features = check_action_feature_access(args.action, feature_flags)
+    if not action_allowed:
+        missing_text = ", ".join(sorted(missing_features))
+        message = f"Action '{args.action}' blocked: required license feature(s) missing: {missing_text}."
+        status_payload = build_minimal_status_payload(license_status, message)
+        if args.action != 'run':
+            emit_json({
+                "success": False,
+                "message": message,
+                "status": status_payload
+            })
+            return
+        print(message)
+        return
+
+    if args.action == 'status' and not feature_flags.get('view', False):
+        limited = build_minimal_status_payload(
+            license_status,
+            "Status is limited because the current license does not enable view features."
+        )
+        limited["success"] = True
+        emit_json(limited)
+        return
+
+    modules = initialize_modules(args, feature_flags)
+    collector = modules["collector"]
+    ReportGenerator = modules["ReportGenerator"]
+
     if args.action == 'status':
         emit_json(build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect')))
         return
@@ -465,6 +653,16 @@ def main():
             })
             return
 
+        provided_role_token = args.role_auth_token or os.environ.get('ISEC_ROLE_AUTH_TOKEN')
+        auth_ok, auth_message = collector.role_manager.authorize_role_change(provided_role_token)
+        if not auth_ok:
+            emit_json({
+                "success": False,
+                "message": auth_message,
+                "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
+            })
+            return
+
         role_map = {
             'collector': UserRole.COLLECTOR,
             'reviewer': UserRole.REVIEWER,
@@ -479,7 +677,7 @@ def main():
             })
             return
 
-        if collector.role_manager.set_role(new_role):
+        if collector.role_manager.set_role(new_role, assigned_by='admin_token'):
             emit_json({
                 "success": True,
                 "message": f"Role set to {args.role}.",
@@ -600,11 +798,14 @@ def main():
         if not status_payload.get('hashChainValid', True):
             emit_json({"success": False, "message": "Report generation blocked: integrity verification failed.", "filePath": None, "status": status_payload})
             return
+        if ReportGenerator is None:
+            emit_json({"success": False, "message": "Report generation blocked: report module unavailable for this license.", "filePath": None, "status": status_payload})
+            return
         report_dir = args.report_dir or collector.output_dir
         os.makedirs(report_dir, exist_ok=True)
         report_gen = ReportGenerator(collector.storage, report_dir)
         report_path = report_gen.generate_signed_report()
-        emit_json({"success": True, "filePath": report_path, "status": build_status_payload(collector)})
+        emit_json({"success": True, "filePath": report_path, "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))})
         return
     if args.action == 'export':
         status_payload = build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
@@ -626,10 +827,22 @@ def main():
         if not args.export_dir:
             emit_json({"success": False, "message": "Export blocked: export directory not provided.", "filePath": None, "status": status_payload})
             return
+        if ReportGenerator is None or not collector.role_manager.has_permission('view') or not license_allows('report'):
+            emit_json({"success": False, "message": "Export blocked: signed report capability is required for verifiable exports.", "filePath": None, "status": status_payload})
+            return
+        report_path = None
+        report_dir = args.report_dir or collector.output_dir
+        try:
+            os.makedirs(report_dir, exist_ok=True)
+            report_gen = ReportGenerator(collector.storage, report_dir)
+            report_path = report_gen.generate_signed_report()
+        except Exception as exc:
+            emit_json({"success": False, "message": f"Export blocked: unable to generate signed report: {exc}", "filePath": None, "status": status_payload})
+            return
         os.makedirs(args.export_dir, exist_ok=True)
-        zip_path = collector.export_to_zip(args.export_dir)
+        zip_path = collector.export_to_zip(args.export_dir, report_path=report_path)
         if zip_path:
-            emit_json({"success": True, "filePath": zip_path, "status": build_status_payload(collector)})
+            emit_json({"success": True, "filePath": zip_path, "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))})
         else:
             emit_json({"success": False, "message": "Export failed.", "filePath": None, "status": status_payload})
         return
@@ -675,10 +888,10 @@ def main():
             print("Browser data collection requires consent.")
             if args.electron_mode:
                 print("Running in Electron mode; skipping interactive browser consent prompt.")
-            elif collector.role_manager.has_permission('collect'):
+            elif collector.role_manager.has_permission('collect') and getattr(collector, 'collect_enabled', False):
                 request_browser_consent(collector)
             else:
-                print("Current role does not have permission to collect evidence, so consent request is skipped.")
+                print("Current role or license does not permit browser evidence collection, so consent request is skipped.")
         else:
             print(f"Browser data collection consent issue: {collector.browser_consent_status.get('message', 'Unknown issue')}")
 
@@ -701,7 +914,7 @@ def main():
         print("\nEvidence collection not permitted due to role restrictions or tampering detection.")
     
     # Generate report if not skipped and user has view permission
-    if not args.no_report and collector.role_manager.has_permission('view') and license_allows('report'):
+    if not args.no_report and collector.role_manager.has_permission('view') and license_allows('report') and ReportGenerator is not None:
         print("\nGenerating forensic report...")
         report_dir = args.report_dir or collector.output_dir
         os.makedirs(report_dir, exist_ok=True)
@@ -718,8 +931,16 @@ def main():
     # Export to ZIP if export directory is specified and user has export permission
     if args.export_dir and collector.role_manager.has_permission('export') and license_allows('export'):
         print("\nExporting evidence to ZIP...")
+        if ReportGenerator is None or not collector.role_manager.has_permission('view') or not license_allows('report'):
+            print("Export blocked: signed report capability is required for verifiable exports.")
+            print("\nProcess completed.")
+            return
         os.makedirs(args.export_dir, exist_ok=True)
-        zip_path = collector.export_to_zip(args.export_dir)
+        report_dir = args.report_dir or collector.output_dir
+        os.makedirs(report_dir, exist_ok=True)
+        report_gen = ReportGenerator(collector.storage, report_dir)
+        report_path = report_gen.generate_signed_report()
+        zip_path = collector.export_to_zip(args.export_dir, report_path=report_path)
         if zip_path:
             print(f"Evidence exported: {zip_path}")
         else:
@@ -733,4 +954,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        if is_production_runtime():
+            sys.stderr.write("Fatal runtime error. Check audit logs for details.\n")
+            sys.exit(1)
+        raise

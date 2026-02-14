@@ -1,0 +1,16 @@
+# Deterministic Python dependency lock for ISEC release builds.
+# This lock file is generated for CPython 3.10 on Windows x86_64.
+# Rebuild this file for other target platforms.
+--require-hashes
+PyPDF2==2.12.1 \
+    --hash=sha256:41ff16ee122bad9790d57a4235281a838002d7f1cc8d631d91b6f65d709bd825
+reportlab==4.0.4 \
+    --hash=sha256:3dcda79ce04baf70721e2ec54854722644262cac2feec3d5c4c5e77015504cb0
+cryptography==41.0.7 \
+    --hash=sha256:90452ba79b8788fa380dfb587cca692976ef4e757b194b093d845e8d99f612f2
+cffi==1.17.1 \
+    --hash=sha256:0f048dcf80db46f0098ccac01132761580d28e28bc0f78ae0d58048063317e15
+pycparser==2.22 \
+    --hash=sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc
+Pillow==10.1.0 \
+    --hash=sha256:41f67248d92a5e0a2076d3517d8d4b1e41a97e2df10eb8f93106c89107f38b57

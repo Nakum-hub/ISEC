@@ -1,0 +1,99 @@
+{
+  "artifacts": [
+    {
+      "file": "ISEC Evidence Collector Setup 1.0.0.exe",
+      "is_installer": true,
+      "sha256": "30983e1445eed43999439cabbf123390a980ae16a7f50a2ccb3d51af8dba7152",
+      "signature": {
+        "error": "",
+        "method": "authenticode",
+        "status": "Valid",
+        "verified": true
+      },
+      "size_bytes": 76292104
+    },
+    {
+      "file": "ISEC Evidence Collector Setup 1.0.0.exe.blockmap",
+      "is_installer": false,
+      "sha256": "d8c00c637b59d3f90268b45ed9c15a0d850b808d9ad7fc6e8c4803c8a45a458b",
+      "signature": {
+        "error": "",
+        "method": null,
+        "status": null,
+        "verified": null
+      },
+      "size_bytes": 80840
+    },
+    {
+      "file": "SHA256SUMS.txt",
+      "is_installer": false,
+      "sha256": "840ccf92a7976258557dfd69070796b7f4c019e001fc8c6cb63475d77f3a1b04",
+      "signature": {
+        "error": "",
+        "method": null,
+        "status": null,
+        "verified": null
+      },
+      "size_bytes": 395
+    },
+    {
+      "file": "builder-debug.yml",
+      "is_installer": false,
+      "sha256": "fa26c7cc7332db64db3054f4ea5a6538292b3166b36ea2c88f1e356611d24dcd",
+      "signature": {
+        "error": "",
+        "method": null,
+        "status": null,
+        "verified": null
+      },
+      "size_bytes": 7044
+    }
+  ],
+  "generated_at_utc": "2026-02-14T13:53:33.674287+00:00",
+  "git_commit_hash": "4bce7ec2e1358c146711200e698819bb10ceb946",
+  "isec_env": "production",
+  "node_dependencies": {
+    "dependencies": {
+      "electron-is-dev": "^2.0.0"
+    },
+    "devDependencies": {
+      "electron": "^28.0.0",
+      "electron-builder": "^24.6.0"
+    },
+    "lock": {
+      "lockfileVersion": 3,
+      "name": "isec-desktop-app",
+      "version": "1.0.0"
+    },
+    "version": "1.0.0"
+  },
+  "python_dependencies": [
+    {
+      "name": "PyPDF2",
+      "version": "2.12.1"
+    },
+    {
+      "name": "reportlab",
+      "version": "4.0.4"
+    },
+    {
+      "name": "cryptography",
+      "version": "41.0.7"
+    },
+    {
+      "name": "cffi",
+      "version": "1.17.1"
+    },
+    {
+      "name": "pycparser",
+      "version": "2.22"
+    },
+    {
+      "name": "Pillow",
+      "version": "10.1.0"
+    }
+  ],
+  "python_version": "3.10.0",
+  "schema": "ISEC_BUILD_MANIFEST_v1",
+  "version": "1.0.0"
+}

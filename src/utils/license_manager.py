@@ -8,11 +8,12 @@ import json
 import os
 import platform
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from src.utils.paths import get_state_dir
 
 PUBLIC_KEY_PEM = """-----BEGIN PUBLIC KEY-----
 REPLACE_WITH_YOUR_PUBLIC_KEY
@@ -24,7 +25,9 @@ def _project_root() -> str:
 
 
 def _load_public_key_pem() -> Optional[str]:
-    env_key = os.environ.get("ISEC_LICENSE_PUBLIC_KEY")
+    is_production = str(os.environ.get("ISEC_ENV", "development")).strip().lower() == "production"
+
+    env_key = None if is_production else os.environ.get("ISEC_LICENSE_PUBLIC_KEY")
     if env_key:
         return env_key
 
@@ -39,6 +42,13 @@ def _load_public_key_pem() -> Optional[str]:
     if os.path.exists(default_key_path):
         try:
             return open(default_key_path, "r", encoding="utf-8").read()
+        except Exception:
+            return None
+
+    state_key_path = os.path.join(get_state_dir(), "keys", "license_public_key.pem")
+    if os.path.exists(state_key_path):
+        try:
+            return open(state_key_path, "r", encoding="utf-8").read()
         except Exception:
             return None
 
@@ -93,10 +103,34 @@ def get_system_fingerprint() -> Tuple[str, Dict[str, str]]:
     return fingerprint, system_info
 
 
+def _normalize_features(features: Any) -> List[str]:
+    if not isinstance(features, (list, tuple, set)):
+        return []
+
+    normalized = []
+    seen = set()
+    for item in features:
+        if not isinstance(item, str):
+            continue
+        feature = item.strip().lower()
+        if not feature or feature in seen:
+            continue
+        seen.add(feature)
+        normalized.append(feature)
+    return normalized
+
+
 class LicenseManager:
-    def __init__(self, license_file: Optional[str] = None, allow_unlicensed: bool = False):
-        self.license_file = license_file or os.environ.get("ISEC_LICENSE_FILE") or os.path.join(_project_root(), "license.json")
-        self.allow_unlicensed = allow_unlicensed or os.environ.get("ISEC_ALLOW_UNLICENSED") == "1"
+    def __init__(self, license_file: Optional[str] = None):
+        if license_file:
+            resolved = license_file
+        else:
+            resolved = os.environ.get("ISEC_LICENSE_FILE") or os.path.join(_project_root(), "license.json")
+            if not os.path.exists(resolved):
+                state_license = os.path.join(get_state_dir(), "license.json")
+                if os.path.exists(state_license):
+                    resolved = state_license
+        self.license_file = resolved
         self.public_key_pem = _load_public_key_pem()
         self.fingerprint, self.system_info = get_system_fingerprint()
 
@@ -165,19 +199,6 @@ class LicenseManager:
         return True, "License constraints satisfied."
 
     def get_status(self) -> Dict[str, Any]:
-        if self.allow_unlicensed:
-            return {
-                "valid": True,
-                "status": "bypassed",
-                "message": "License enforcement bypassed.",
-                "plan": "development",
-                "features": ["all"],
-                "expires_at": None,
-                "license_id": None,
-                "customer": None,
-                "system_fingerprint": self.fingerprint,
-            }
-
         payload, signature, error = self._load_license()
         if error:
             return {
@@ -194,12 +215,13 @@ class LicenseManager:
 
         signature_ok, signature_message = self._verify_signature(payload, signature)
         if not signature_ok:
+            features = _normalize_features(payload.get("features", []))
             return {
                 "valid": False,
                 "status": "invalid_signature",
                 "message": signature_message,
                 "plan": payload.get("plan"),
-                "features": payload.get("features", []),
+                "features": features,
                 "expires_at": payload.get("expires_at"),
                 "license_id": payload.get("license_id"),
                 "customer": payload.get("customer"),
@@ -208,24 +230,26 @@ class LicenseManager:
 
         constraints_ok, constraints_message = self._verify_constraints(payload)
         if not constraints_ok:
+            features = _normalize_features(payload.get("features", []))
             return {
                 "valid": False,
                 "status": "invalid_constraints",
                 "message": constraints_message,
                 "plan": payload.get("plan"),
-                "features": payload.get("features", []),
+                "features": features,
                 "expires_at": payload.get("expires_at"),
                 "license_id": payload.get("license_id"),
                 "customer": payload.get("customer"),
                 "system_fingerprint": self.fingerprint,
             }
 
+        features = _normalize_features(payload.get("features", []))
         return {
             "valid": True,
             "status": "valid",
             "message": "License verified.",
             "plan": payload.get("plan"),
-            "features": payload.get("features", []),
+            "features": features,
             "expires_at": payload.get("expires_at"),
             "license_id": payload.get("license_id"),
             "customer": payload.get("customer"),
@@ -237,8 +261,8 @@ class LicenseManager:
         if not status.get("valid"):
             return False
         features = status.get("features") or []
-        if not features:
-            return True
         if "all" in features:
             return True
-        return action in features
+        if not action:
+            return False
+        return str(action).strip().lower() in features

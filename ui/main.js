@@ -9,6 +9,13 @@ try {
   isDev = !!(process.env.ELECTRON_IS_DEV === '1' || process.defaultApp || process.versions.electron);
 }
 const crypto = require('crypto');
+const roleAuthSessionId = (typeof crypto.randomUUID === 'function')
+  ? crypto.randomUUID()
+  : crypto.randomBytes(16).toString('hex');
+
+if (app.isPackaged) {
+  isDev = false;
+}
 
 const allowedUiFragments = new Set([
   'views/dashboard.html',
@@ -26,12 +33,105 @@ let lastBackendStatus = null;
 let pythonBusy = false;
 let statusRefreshPromise = null;
 let pythonQueue = Promise.resolve();
+let missingPackagedKeyWarned = false;
 
-const pythonPath = 'python';
-const scriptPath = path.join(__dirname, '..', 'main.py');
-const roleFilePath = path.join(__dirname, '..', 'user_roles.encrypted');
-const licenseFilePath = path.join(__dirname, '..', 'license.json');
-const updatesDir = path.join(__dirname, '..', 'updates');
+function getRuntimeEnv() {
+  const raw = String(process.env.ISEC_ENV || (app.isPackaged ? 'production' : 'development'))
+    .trim()
+    .toLowerCase();
+  if (raw === 'production' || raw === 'testing' || raw === 'development') {
+    return raw;
+  }
+  return 'development';
+}
+
+function validateProductionRuntime() {
+  const runtimeEnv = getRuntimeEnv();
+  process.env.ISEC_ENV = runtimeEnv;
+  if (runtimeEnv !== 'production') {
+    return;
+  }
+
+  const forbiddenVars = [
+    'ISEC_ALLOW_UNLICENSED',
+    'ISEC_DEV_ALLOW_UNLICENSED',
+    'ISEC_ROLE_AUTH_BYPASS'
+  ];
+  const activeVars = forbiddenVars.filter((name) => {
+    const value = process.env[name];
+    return value && String(value).trim().length > 0;
+  });
+  if (activeVars.length > 0) {
+    throw new Error(`Insecure production configuration: ${activeVars.join(', ')}`);
+  }
+}
+
+function getStateDir() {
+  const baseDir = app.getPath('userData');
+  const stateDir = path.join(baseDir, 'state');
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create state directory:', err);
+  }
+  return stateDir;
+}
+
+function getBackendPaths() {
+  if (app.isPackaged) {
+    const backendDir = path.join(process.resourcesPath, 'backend');
+    return {
+      backendDir,
+      scriptPath: path.join(backendDir, 'main.py')
+    };
+  }
+  const backendDir = path.join(__dirname, '..');
+  return {
+    backendDir,
+    scriptPath: path.join(backendDir, 'main.py')
+  };
+}
+
+function resolvePythonPath() {
+  if (process.env.ISEC_PYTHON) {
+    return process.env.ISEC_PYTHON;
+  }
+  if (app.isPackaged) {
+    const bundledPython = path.join(process.resourcesPath, 'python', 'python.exe');
+    if (fs.existsSync(bundledPython)) {
+      return bundledPython;
+    }
+  }
+  return 'python';
+}
+
+function resolvePackagedLicensePublicKeyPath() {
+  if (!app.isPackaged) {
+    return null;
+  }
+
+  const candidates = [
+    path.join(process.resourcesPath, 'keys', 'license_public_key.pem'),
+    path.join(process.resourcesPath, 'backend', 'keys', 'license_public_key.pem')
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function getUpdatesDir() {
+  const dir = path.join(getStateDir(), 'updates');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create updates directory:', err);
+  }
+  return dir;
+}
 let uiLogStream = null;
 
 const originalConsole = {
@@ -166,16 +266,28 @@ function getStoragePaths() {
   return { baseDir, evidenceDir, reportsDir, exportsDir };
 }
 
-function runPythonAction(action, extraArgs = []) {
+function runPythonAction(action, extraArgs = [], extraEnv = {}) {
   const task = () => new Promise((resolve, reject) => {
     pythonBusy = true;
 
     const storagePaths = getStoragePaths();
     const evidenceDir = storagePaths.evidenceDir;
+    const stateDir = getStateDir();
 
-    const defaultRoleArgs = fs.existsSync(roleFilePath) ? [] : ['--default-role', 'collector'];
+    const licenseFilePath = process.env.ISEC_LICENSE_FILE || path.join(stateDir, 'license.json');
     const licenseArgs = ['--license-file', licenseFilePath];
-    const allowUnlicensedArgs = isDev ? ['--allow-unlicensed'] : [];
+    const sanitizedExtraArgs = [];
+    const forbiddenArgs = new Set(['--allow-unlicensed', '--default-role']);
+    for (let i = 0; i < extraArgs.length; i += 1) {
+      const arg = String(extraArgs[i] || '');
+      if (forbiddenArgs.has(arg)) {
+        const err = new Error(`Blocked insecure backend argument: ${arg}`);
+        pythonBusy = false;
+        reject(err);
+        return;
+      }
+      sanitizedExtraArgs.push(arg);
+    }
 
     const timeoutMsMap = {
       status: 60000,
@@ -192,20 +304,54 @@ function runPythonAction(action, extraArgs = []) {
       ? ['--report-dir', storagePaths.reportsDir]
       : [];
 
+    const backendPaths = getBackendPaths();
+    const pythonPath = resolvePythonPath();
+    if (!fs.existsSync(backendPaths.scriptPath)) {
+      const err = new Error(`Backend script not found: ${backendPaths.scriptPath}`);
+      err.backendPath = backendPaths.scriptPath;
+      pythonBusy = false;
+      reject(err);
+      return;
+    }
+
     const args = [
-      scriptPath,
+      backendPaths.scriptPath,
       '--output-dir',
       evidenceDir,
+      '--state-dir',
+      stateDir,
       '--electron-mode',
-      ...defaultRoleArgs,
       ...licenseArgs,
-      ...allowUnlicensedArgs,
       '--action',
       action,
       ...reportArgs,
-      ...extraArgs
+      ...sanitizedExtraArgs
     ];
-    const proc = spawn(pythonPath, args, { cwd: path.join(__dirname, '..') });
+    const env = {
+      ...process.env,
+      ISEC_STATE_DIR: stateDir,
+      ISEC_ROLE_AUTH_SESSION_ID: roleAuthSessionId,
+      ISEC_ENV: getRuntimeEnv(),
+      ...extraEnv
+    };
+    delete env.ISEC_DEV_ALLOW_UNLICENSED;
+    delete env.ISEC_ALLOW_UNLICENSED;
+    delete env.ISEC_ROLE_AUTH_BYPASS;
+    delete env.ISEC_LICENSE_PUBLIC_KEY;
+    if (app.isPackaged) {
+      env.ISEC_ENV = 'production';
+      env.NODE_ENV = 'production';
+      env.ELECTRON_IS_DEV = '0';
+    }
+    const publicKeyPath = resolvePackagedLicensePublicKeyPath();
+    if (publicKeyPath) {
+      env.ISEC_LICENSE_PUBLIC_KEY_FILE = publicKeyPath;
+    } else if (app.isPackaged && !missingPackagedKeyWarned) {
+      missingPackagedKeyWarned = true;
+      console.warn('Packaged license public key not found. License checks may fail.');
+    }
+
+    const proc = spawn(pythonPath, args, { cwd: backendPaths.backendDir, env });
 
     let stdout = '';
     let stderr = '';
@@ -305,6 +451,7 @@ function computeSha256(filePath) {
 }
 
 function checkOfflineUpdate() {
+  const updatesDir = getUpdatesDir();
   const manifestPath = path.join(updatesDir, 'manifest.json');
   const currentVersion = app.getVersion();
 
@@ -327,11 +474,13 @@ function checkOfflineUpdate() {
     return { available: false, reason: 'package_missing', currentVersion, availableVersion: manifest.version };
   }
 
-  if (manifest.sha256) {
-    const actualHash = computeSha256(packagePath);
-    if (actualHash.toLowerCase() !== String(manifest.sha256).toLowerCase()) {
-      return { available: false, reason: 'checksum_mismatch', currentVersion, availableVersion: manifest.version };
-    }
+  if (!manifest.sha256) {
+    return { available: false, reason: 'checksum_missing', currentVersion, availableVersion: manifest.version };
+  }
+
+  const actualHash = computeSha256(packagePath);
+  if (actualHash.toLowerCase() !== String(manifest.sha256).toLowerCase()) {
+    return { available: false, reason: 'checksum_mismatch', currentVersion, availableVersion: manifest.version };
   }
 
   return {
@@ -429,12 +578,28 @@ function createWindow() {
 
 // Create window when Electron is ready
 app.whenReady().then(() => {
+  try {
+    validateProductionRuntime();
+  } catch (err) {
+    console.error('Runtime validation failed:', err.message || err);
+    app.exit(1);
+    return;
+  }
+
   setupUiLogging();
 
   process.on('uncaughtException', (err) => {
+    if (getRuntimeEnv() === 'production') {
+      console.error('Uncaught exception in production runtime.');
+      return;
+    }
     console.error('Uncaught exception:', err);
   });
   process.on('unhandledRejection', (reason) => {
+    if (getRuntimeEnv() === 'production') {
+      console.error('Unhandled rejection in production runtime.');
+      return;
+    }
     console.error('Unhandled rejection:', reason);
   });
 
@@ -679,7 +844,7 @@ ipcMain.handle('get-user-role', async () => {
 });
 
 // IPC handler to set user role (would typically require admin privileges in real app)
-ipcMain.handle('set-user-role', async (event, role) => {
+ipcMain.handle('set-user-role', async (event, payload) => {
   try {
     await refreshBackendStatus();
 
@@ -687,12 +852,20 @@ ipcMain.handle('set-user-role', async (event, role) => {
       return { success: false, message: 'Role change blocked due to tampering detection.' };
     }
 
-    const roleValue = String(role || '').toLowerCase();
+    const roleValue = String(
+      payload && typeof payload === 'object' ? payload.role : payload
+    ).toLowerCase();
+    const authToken = String(
+      payload && typeof payload === 'object' && payload.authToken ? payload.authToken : ''
+    ).trim();
+
     if (!['collector', 'reviewer', 'exporter'].includes(roleValue)) {
       return { success: false, message: 'Invalid role selection.' };
     }
 
-    const res = await runPythonAction('set_role', ['--role', roleValue]);
+    const extraArgs = ['--role', roleValue];
+    const extraEnv = authToken ? { ISEC_ROLE_AUTH_TOKEN: authToken } : {};
+    const res = await runPythonAction('set_role', extraArgs, extraEnv);
     const json = res.json;
 
     if (json && json.status) {
