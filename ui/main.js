@@ -32,8 +32,12 @@ let userPermissions = ['view']; // Default permissions
 let lastBackendStatus = null;
 let pythonBusy = false;
 let statusRefreshPromise = null;
+let lastStatusRefreshAt = 0;
 let pythonQueue = Promise.resolve();
 let missingPackagedKeyWarned = false;
+
+const STATUS_REFRESH_MIN_INTERVAL_MS = 3000;
+const STATUS_REFRESH_UNLICENSED_INTERVAL_MS = 20000;
 
 function getRuntimeEnv() {
   const raw = String(process.env.ISEC_ENV || (app.isPackaged ? 'production' : 'development'))
@@ -238,6 +242,7 @@ function extractJsonMarker(output) {
 function applyBackendStatus(status) {
   if (!status) return;
   lastBackendStatus = status;
+  lastStatusRefreshAt = Date.now();
   if (status.tamperingDetected !== undefined) {
     tamperingDetected = !!status.tamperingDetected;
   }
@@ -264,6 +269,49 @@ function getStoragePaths() {
   }
 
   return { baseDir, evidenceDir, reportsDir, exportsDir };
+}
+
+function isLikelyPythonErrorLine(line) {
+  const normalized = String(line || '').toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.includes('traceback')) {
+    return true;
+  }
+  if (normalized.includes('exception')) {
+    return true;
+  }
+  if (normalized.includes('critical')) {
+    return true;
+  }
+  if (normalized.includes('error')) {
+    return true;
+  }
+  if (normalized.includes('failed')) {
+    return true;
+  }
+  return false;
+}
+
+function logPythonStderr(chunk) {
+  const text = String(chunk || '');
+  if (!text) {
+    return;
+  }
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) {
+    return;
+  }
+
+  lines.forEach((line) => {
+    if (isLikelyPythonErrorLine(line)) {
+      console.error(`Python stderr: ${line}`);
+      return;
+    }
+    console.info(`Python stderr: ${line}`);
+  });
 }
 
 function runPythonAction(action, extraArgs = [], extraEnv = {}) {
@@ -381,7 +429,7 @@ function runPythonAction(action, extraArgs = [], extraEnv = {}) {
       const chunk = data.toString();
       stderr += chunk;
 
-      console.error(`Python stderr: ${chunk}`);
+      logPythonStderr(chunk);
       if (chunk.includes('TAMPERING DETECTED')) {
         tamperingDetected = true;
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -494,12 +542,25 @@ function checkOfflineUpdate() {
 }
 
 async function refreshBackendStatus() {
+  const now = Date.now();
+  const refreshIntervalMs = (
+    lastBackendStatus &&
+    lastBackendStatus.license &&
+    lastBackendStatus.license.valid
+  )
+    ? STATUS_REFRESH_MIN_INTERVAL_MS
+    : STATUS_REFRESH_UNLICENSED_INTERVAL_MS;
+
+  if (lastBackendStatus && (now - lastStatusRefreshAt) < refreshIntervalMs) {
+    return lastBackendStatus;
+  }
+
   if (statusRefreshPromise) {
     return statusRefreshPromise;
   }
 
   if (pythonBusy) {
-    return;
+    return lastBackendStatus;
   }
 
   statusRefreshPromise = (async () => {
@@ -509,10 +570,12 @@ async function refreshBackendStatus() {
     } else if (res.json && res.json.status) {
       applyBackendStatus(res.json.status);
     }
+    lastStatusRefreshAt = Date.now();
+    return lastBackendStatus;
   })();
 
   try {
-    await statusRefreshPromise;
+    return await statusRefreshPromise;
   } finally {
     statusRefreshPromise = null;
   }

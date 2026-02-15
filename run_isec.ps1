@@ -46,12 +46,17 @@ if ($ResetDatabase) {
         Remove-Item $dbPath -Force
     }
 
-    $consentEnc = Join-Path $PSScriptRoot "consents.encrypted"
+    $stateDir = $env:ISEC_STATE_DIR
+    if (-not $stateDir) {
+        $stateDir = Join-Path $env:APPDATA "ISEC"
+    }
+
+    $consentEnc = Join-Path $stateDir "consents.encrypted"
     if (Test-Path $consentEnc) {
         Remove-Item $consentEnc -Force
     }
 
-    $rolesEnc = Join-Path $PSScriptRoot "user_roles.encrypted"
+    $rolesEnc = Join-Path $stateDir "user_roles.encrypted"
     if (Test-Path $rolesEnc) {
         Remove-Item $rolesEnc -Force
     }

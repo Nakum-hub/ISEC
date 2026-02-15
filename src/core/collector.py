@@ -7,6 +7,7 @@ import zipfile
 import hashlib
 import shutil
 import tempfile
+import json
 from datetime import datetime
 from src.storage.database import EvidenceDatabase
 from src.collectors.system_logs import SystemLogsCollector
@@ -16,14 +17,16 @@ from src.collectors.file_metadata import FileMetadataCollector
 from src.utils.consent_manager import get_consent_manager, ConsentStatus
 from src.utils.role_manager import get_role_manager, UserRole
 from src.utils.retention_engine import get_retention_engine, RetentionPolicy
+from src.utils.digital_signer import get_signer
 import getpass
 import platform
 import socket
 
 
 class EvidenceCollector:
-    def __init__(self, output_dir, default_role=None, update_chain_results=True):
+    def __init__(self, output_dir, update_chain_results=True, collect_enabled=True):
         self.output_dir = output_dir
+        self.collect_enabled = bool(collect_enabled)
         # Initialize secure database with encryption
         self.storage = EvidenceDatabase(os.path.join(output_dir, "evidence.db"))
         
@@ -33,7 +36,7 @@ class EvidenceCollector:
         self.ip_address = self._get_local_ip()
         
         # Initialize role manager for access control
-        self.role_manager = get_role_manager(self.storage, default_role=default_role)
+        self.role_manager = get_role_manager(self.storage)
         self.current_role = self.role_manager.get_role_description()
         
         # Initialize retention engine
@@ -55,8 +58,8 @@ class EvidenceCollector:
         self.browser_consent_status = self.consent_manager.check_consent_status('browser_data')
         self.browser_consent_granted = self.browser_consent_status['status'] == ConsentStatus.GRANTED.value
         
-        # Initialize collectors conditionally based on role permissions
-        if self.role_manager.has_permission('collect'):
+        # Initialize collectors only when collection is licensed and role permits it.
+        if self.collect_enabled and self.role_manager.has_permission('collect'):
             self.system_logs_collector = SystemLogsCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
             self.network_connections_collector = NetworkConnectionsCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
             self.file_metadata_collector = FileMetadataCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
@@ -75,7 +78,7 @@ class EvidenceCollector:
             self.browser_history_collector = None
         
         # Flag to indicate if evidence collection should proceed
-        self.collection_allowed = not self.tampering_detected and self.role_manager.has_permission('collect')
+        self.collection_allowed = self.collect_enabled and not self.tampering_detected and self.role_manager.has_permission('collect')
     
     def _get_local_ip(self):
         """Get the local IP address for chain of custody (offline-safe)."""
@@ -97,6 +100,10 @@ class EvidenceCollector:
     
     def collect_all_evidence(self):
         """Collect all types of evidence with consent enforcement and role-based access control"""
+        if not self.collect_enabled:
+            print("Evidence collection disabled: collect feature is not enabled in the active license.")
+            return
+
         if self.tampering_detected:
             print("Evidence collection disabled due to tampering detection.")
             return
@@ -135,6 +142,10 @@ class EvidenceCollector:
 
     def collect_selected_evidence(self, evidence_types):
         """Collect only selected evidence types."""
+        if not self.collect_enabled:
+            print("Evidence collection disabled: collect feature is not enabled in the active license.")
+            return
+
         if self.tampering_detected:
             print("Evidence collection disabled due to tampering detection.")
             return
@@ -178,7 +189,7 @@ class EvidenceCollector:
         if expired_result['flagged'] > 0:
             print(f"Flagged {expired_result['flagged']} expired evidence items")
     
-    def export_to_zip(self, export_dir):
+    def export_to_zip(self, export_dir, report_path=None):
         """Export all evidence to a ZIP file with checksum manifest - requires exporter role"""
         if not self.role_manager.has_permission('export'):
             print(f"Access denied: Role '{self.current_role['name']}' does not have permission to export evidence.")
@@ -191,15 +202,49 @@ class EvidenceCollector:
         try:
             tmp_dir = tempfile.mkdtemp(prefix='isek_export_', dir=export_dir)
 
-            manifest_content = self._generate_checksum_manifest()
-            manifest_path = os.path.join(tmp_dir, "checksum_manifest.txt")
-            with open(manifest_path, 'w') as f:
-                f.write(manifest_content)
+            files_to_package = {
+                os.path.basename(self.storage.db_path): self.storage.db_path
+            }
+
+            signer_public_key_path = None
+            try:
+                signer = get_signer()
+                if signer and os.path.exists(signer.public_key_path):
+                    signer_public_key_path = signer.public_key_path
+                    files_to_package[os.path.basename(signer.public_key_path)] = signer.public_key_path
+            except Exception:
+                signer_public_key_path = None
+
+            report_sig_path = None
+            if report_path and os.path.exists(report_path):
+                report_name = os.path.basename(report_path)
+                files_to_package[report_name] = report_path
+                candidate_sig = report_path + ".sig.json"
+                if os.path.exists(candidate_sig):
+                    report_sig_path = candidate_sig
+                    files_to_package[os.path.basename(candidate_sig)] = candidate_sig
+
+            manifest_data = self._build_export_manifest(
+                files_to_package,
+                report_path=report_path,
+                report_signature_path=report_sig_path,
+                signer_public_key_path=signer_public_key_path,
+            )
+
+            manifest_json_path = os.path.join(tmp_dir, "checksum_manifest.json")
+            with open(manifest_json_path, 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, indent=2, sort_keys=True)
+            files_to_package["checksum_manifest.json"] = manifest_json_path
+
+            manifest_text_path = os.path.join(tmp_dir, "checksum_manifest.txt")
+            with open(manifest_text_path, 'w', encoding='utf-8') as f:
+                f.write(self._generate_checksum_manifest(manifest_data))
+            files_to_package["checksum_manifest.txt"] = manifest_text_path
 
             tmp_zip_path = os.path.join(tmp_dir, zip_filename)
             with zipfile.ZipFile(tmp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                zipf.write(self.storage.db_path, os.path.basename(self.storage.db_path))
-                zipf.write(manifest_path, os.path.basename(manifest_path))
+                for archive_name, source_path in files_to_package.items():
+                    zipf.write(source_path, archive_name)
 
             if not os.path.exists(tmp_zip_path) or os.path.getsize(tmp_zip_path) <= 0:
                 print("Export failed: ZIP was not created correctly.")
@@ -216,58 +261,72 @@ class EvidenceCollector:
                     shutil.rmtree(tmp_dir)
                 except Exception:
                     pass
-    
-    def _generate_checksum_manifest(self):
-        """Generate a manifest with SHA-256 checksums for all evidence files"""
-        manifest = f"Checksum Manifest - Generated: {datetime.now().isoformat()}\n"
-        manifest += "="*60 + "\n\n"
-        
-        # Add database checksum
-        db_hash = self._calculate_file_hash(self.storage.db_path)
-        manifest += f"{db_hash}  {os.path.basename(self.storage.db_path)}\n"
-        
-        # Add hash chain verification result
-        hash_chain_valid = self.storage.get_hash_chain_verification_result()
-        tamper_status = "PASS" if hash_chain_valid else "FAIL - TAMPERING DETECTED!"
-        manifest += f"\nHash Chain Integrity: {tamper_status}\n"
-        
-        # Add consent status information
-        consent_summary = self.consent_manager.get_consent_summary()
-        manifest += f"\nConsent Status:\n"
-        for collection_type, status_info in consent_summary.items():
-            manifest += f"  {collection_type}: {status_info['status']} - {status_info['message']}\n"
-        
-        # Add role information
-        role_info = self.role_manager.get_role_description()
-        manifest += f"\nUser Role: {role_info['name']} ({role_info['role']})\n"
-        manifest += f"Permissions: {', '.join(role_info['permissions'])}\n"
-        
-        # Add retention status information
-        retention_status = self.retention_engine.get_retention_status()
-        manifest += f"\nRetention Policy: {retention_status['policy']}\n"
-        manifest += f"Retention Days: {retention_status['retention_days']}\n"
-        manifest += f"Total Evidence: {retention_status['total_evidence']}\n"
-        manifest += f"Active Evidence: {retention_status['active_evidence']}\n"
-        manifest += f"Expired Evidence: {retention_status['expired_evidence']}\n"
-        
-        # Add integrity verification for evidence
-        all_evidence = self.storage.get_all_evidence()
-        manifest += f"\nIntegrity Verification:\n"
-        manifest += f"Total Evidence Items: {len(all_evidence)}\n"
-        
-        verified_count = 0
-        for evidence_row in all_evidence[:10]:  # Show first 10 for brevity
-            evidence_id = evidence_row[0]
-            integrity_ok = self.storage.verify_integrity(evidence_id)
-            if integrity_ok:
-                verified_count += 1
-            manifest += f"Evidence ID {evidence_id}: {'PASS' if integrity_ok else 'FAIL'}\n"
-        
-        if len(all_evidence) > 10:
-            manifest += f"... and {len(all_evidence) - 10} more items\n"
-        
-        manifest += f"\nOverall Integrity: {verified_count}/{len(all_evidence)} items verified as authentic\n"
-        
+
+    def _build_export_manifest(self, files_to_package, report_path=None, report_signature_path=None, signer_public_key_path=None):
+        evidence_rows = self.storage.get_all_evidence()
+        total_records = len(evidence_rows)
+        verified_records = 0
+        for row in evidence_rows:
+            evidence_id = row[0]
+            if self.storage.verify_integrity(evidence_id):
+                verified_records += 1
+
+        hash_chain_valid = self.storage.verify_full_hash_chain(update_results=True)
+        db_name = os.path.basename(self.storage.db_path)
+
+        file_hashes = {}
+        for archive_name, source_path in files_to_package.items():
+            file_hashes[archive_name] = self._calculate_file_hash(source_path)
+
+        return {
+            "schema": "ISEC_EXPORT_MANIFEST_v1",
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "files": file_hashes,
+            "evidence_database": {
+                "file": db_name,
+                "sha256": file_hashes.get(db_name),
+                "hash_chain_valid": hash_chain_valid,
+                "total_records": total_records,
+            },
+            "chain_of_custody": {
+                "verified_records": verified_records,
+                "total_records": total_records,
+                "all_signatures_valid": verified_records == total_records,
+            },
+            "pdf_signature": {
+                "report_file": os.path.basename(report_path) if report_path and os.path.exists(report_path) else None,
+                "signature_file": os.path.basename(report_signature_path) if report_signature_path and os.path.exists(report_signature_path) else None,
+                "present": bool(report_path and report_signature_path and os.path.exists(report_path) and os.path.exists(report_signature_path)),
+                "public_key_file": os.path.basename(signer_public_key_path) if signer_public_key_path and os.path.exists(signer_public_key_path) else None,
+            },
+            "consent_summary": self.consent_manager.get_consent_summary(),
+            "role": self.role_manager.get_role_description(),
+            "retention": self.retention_engine.get_retention_status(),
+        }
+
+    def _generate_checksum_manifest(self, manifest_data):
+        """Generate a human-readable checksum manifest from structured export metadata."""
+        manifest = f"Checksum Manifest - Generated: {manifest_data.get('generated_at')}\n"
+        manifest += "=" * 60 + "\n\n"
+
+        files = manifest_data.get("files", {})
+        for archive_name in sorted(files.keys()):
+            manifest += f"{files[archive_name]}  {archive_name}\n"
+
+        db_info = manifest_data.get("evidence_database", {})
+        chain_info = manifest_data.get("chain_of_custody", {})
+        pdf_info = manifest_data.get("pdf_signature", {})
+        manifest += "\nHash Chain Integrity: "
+        manifest += "PASS\n" if db_info.get("hash_chain_valid") else "FAIL - TAMPERING DETECTED!\n"
+        manifest += f"Chain-of-Custody Signatures: {chain_info.get('verified_records', 0)}/{chain_info.get('total_records', 0)} verified\n"
+        manifest += f"PDF Signature Present: {'YES' if pdf_info.get('present') else 'NO'}\n"
+        if pdf_info.get("report_file"):
+            manifest += f"Report File: {pdf_info.get('report_file')}\n"
+        if pdf_info.get("signature_file"):
+            manifest += f"Report Signature File: {pdf_info.get('signature_file')}\n"
+        if pdf_info.get("public_key_file"):
+            manifest += f"Signature Public Key File: {pdf_info.get('public_key_file')}\n"
+
         return manifest
         
     def _calculate_file_hash(self, file_path):

@@ -102,10 +102,10 @@ async function refreshReportPermissions() {
       return;
     }
 
-    const licenseValid = status && status.license ? !!status.license.valid : true;
-    const canView = status && Array.isArray(status.permissions) ? status.permissions.includes('view') : true;
+    const licenseValid = status && status.license ? !!status.license.valid : false;
+    const canView = status && Array.isArray(status.permissions) ? status.permissions.includes('view') : false;
     const features = status && status.license ? (status.license.features || []) : [];
-    const canReport = features.length === 0 || features.includes('report') || features.includes('all');
+    const canReport = features.includes('report') || features.includes('all');
 
     const allowed = licenseValid && canView && canReport;
     generateBtn.disabled = !allowed;

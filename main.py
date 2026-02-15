@@ -339,9 +339,25 @@ def set_retention_policy(collector):
 
 
 def emit_json(payload):
-    out = ACTION_STDOUT if ACTION_STDOUT is not None else sys.stdout
-    out.write("ISEC_JSON:" + json.dumps(payload) + "\n")
-    out.flush()
+    line = "ISEC_JSON:" + json.dumps(payload) + "\n"
+    candidate_streams = [ACTION_STDOUT, sys.stdout, getattr(sys, "__stdout__", None)]
+    for stream in candidate_streams:
+        if stream is None:
+            continue
+        try:
+            stream.write(line)
+            stream.flush()
+            return
+        except (BrokenPipeError, OSError, ValueError):
+            continue
+        except Exception:
+            continue
+
+    # Last-resort write to stdout file descriptor to avoid crashing backend action handlers.
+    try:
+        os.write(1, line.encode("utf-8"))
+    except Exception:
+        pass
 
 
 def build_status_payload(collector, license_status=None, license_allowed_collect=True):

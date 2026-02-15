@@ -14,6 +14,7 @@ import base64
 import getpass
 import platform
 
+from src.utils.paths import get_project_root, get_state_file
 
 class ConsentStatus(Enum):
     PENDING = "PENDING"
@@ -27,8 +28,9 @@ class ConsentManager:
         self.storage = storage  # Pass the database storage object
         self.user = getpass.getuser()
         self.host = platform.node()
-        self.consent_file = os.path.join(os.path.dirname(__file__), "..", "..", "consents.json")
-        self.encrypted_consent_file = os.path.join(os.path.dirname(__file__), "..", "..", "consents.encrypted")
+        self.consent_file = get_state_file("consents.json")
+        self.encrypted_consent_file = get_state_file("consents.encrypted")
+        self.legacy_encrypted_consent_file = os.path.join(get_project_root(), "consents.encrypted")
         
         # Encryption key derived from system info
         self.fernet = Fernet(self._derive_encryption_key())
@@ -57,11 +59,17 @@ class ConsentManager:
     def _load_consents(self):
         """Load consents from encrypted storage"""
         try:
-            if not os.path.exists(self.encrypted_consent_file):
+            target_file = None
+            if os.path.exists(self.encrypted_consent_file):
+                target_file = self.encrypted_consent_file
+            elif os.path.exists(self.legacy_encrypted_consent_file):
+                target_file = self.legacy_encrypted_consent_file
+
+            if not target_file:
                 return {}
-            
+
             # Read encrypted consent data
-            with open(self.encrypted_consent_file, 'rb') as f:
+            with open(target_file, 'rb') as f:
                 encrypted_data = f.read()
             
             # Decrypt using system-derived key
@@ -81,8 +89,18 @@ class ConsentManager:
             encrypted_data = self.fernet.encrypt(json.dumps(self.consents).encode())
             
             # Save encrypted consent data
-            with open(self.encrypted_consent_file, 'wb') as f:
-                f.write(encrypted_data)
+            wrote = False
+            try:
+                with open(self.encrypted_consent_file, 'wb') as f:
+                    f.write(encrypted_data)
+                wrote = True
+            except Exception:
+                wrote = False
+
+            if not wrote:
+                # Fallback to legacy location if state dir is not writable
+                with open(self.legacy_encrypted_consent_file, 'wb') as f:
+                    f.write(encrypted_data)
             
             # Also save to database for audit trail
             self.storage.store_evidence(

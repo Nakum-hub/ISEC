@@ -167,19 +167,43 @@ async function loadDashboardStats() {
 function updateLicenseUI(license) {
   const licenseStatusEl = document.getElementById('license-status');
   const licensePlanEl = document.getElementById('license-plan');
+  const licenseIdEl = document.getElementById('license-id');
+  const licenseCustomerEl = document.getElementById('license-customer');
+  const licensePlanDetailEl = document.getElementById('license-plan-detail');
+  const licenseExpirationEl = document.getElementById('license-expiration');
+  const licenseFeaturesEl = document.getElementById('license-features');
+  const licenseFingerprintEl = document.getElementById('license-fingerprint');
 
   if (!licenseStatusEl || !licensePlanEl) {
     return;
   }
 
+  const setField = (el, value) => {
+    if (el) {
+      el.textContent = value;
+    }
+  };
+
   if (!license) {
     licenseStatusEl.textContent = 'Unknown';
     licensePlanEl.textContent = 'License Status';
+    setField(licenseIdEl, 'Unknown');
+    setField(licenseCustomerEl, 'Unknown');
+    setField(licensePlanDetailEl, 'Unknown');
+    setField(licenseExpirationEl, 'Unknown');
+    setField(licenseFeaturesEl, 'None');
+    setField(licenseFingerprintEl, 'Unknown');
     return;
   }
 
   licenseStatusEl.textContent = license.valid ? 'Licensed' : 'Unlicensed';
   licensePlanEl.textContent = license.plan ? `Plan: ${license.plan}` : (license.message || 'License Status');
+  setField(licenseIdEl, license.license_id || 'Unknown');
+  setField(licenseCustomerEl, license.customer || 'Unknown');
+  setField(licensePlanDetailEl, license.plan || 'Unknown');
+  setField(licenseExpirationEl, license.expires_at || 'No expiration');
+  setField(licenseFeaturesEl, Array.isArray(license.features) && license.features.length > 0 ? license.features.join(', ') : 'None');
+  setField(licenseFingerprintEl, license.system_fingerprint || 'Unknown');
 
 }
 
@@ -192,7 +216,7 @@ function updatePermissionUI(status) {
   const permissions = Array.isArray(status.permissions) ? status.permissions : [];
   const canCollect = permissions.includes('collect');
   const tampered = !!status.tamperingDetected;
-  const licenseValid = status.license ? !!status.license.valid : true;
+  const licenseValid = status.license ? !!status.license.valid : false;
 
   const disabledState = !canCollect || tampered || !licenseValid;
   let titleText = '';

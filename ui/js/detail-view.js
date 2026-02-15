@@ -126,11 +126,11 @@ async function refreshDetailPermissions() {
       return;
     }
 
-    const licenseValid = status && status.license ? !!status.license.valid : true;
+    const licenseValid = status && status.license ? !!status.license.valid : false;
     const permissions = status && Array.isArray(status.permissions) ? status.permissions : [];
     const canExport = permissions.includes('export');
     const features = status && status.license ? (status.license.features || []) : [];
-    const licenseAllows = features.length === 0 || features.includes('export') || features.includes('all');
+    const licenseAllows = features.includes('export') || features.includes('all');
 
     const allowed = licenseValid && canExport && licenseAllows;
     exportBtn.disabled = !allowed;

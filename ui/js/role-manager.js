@@ -73,6 +73,9 @@ const RoleManager = {
             if (status.tamperingDetected) {
                 switchBtn.disabled = true;
                 switchBtn.title = 'Role switching blocked: Tampering Detected';
+            } else if (status.roleAuthRequired && !status.roleAuthConfigured) {
+                switchBtn.disabled = true;
+                switchBtn.title = 'Role switching blocked: admin token not configured';
             } else {
                 switchBtn.disabled = false;
                 switchBtn.title = 'Switch to selected role';
@@ -97,11 +100,22 @@ const RoleManager = {
 
         const targetRole = String(roleSelect.value || '').toLowerCase();
 
+        const tokenInput = prompt('Enter role admin token to authorize role change:');
+        if (tokenInput === null) return;
+        const authToken = String(tokenInput || '').trim();
+        if (!authToken) {
+            alert('Role admin token is required.');
+            return;
+        }
+
         const confirmSwitch = confirm(`Authenticate as '${targetRole}'? \n\nThis action will be logged in the secure audit trail.`);
         if (!confirmSwitch) return;
 
         try {
-            const result = await bridge.invoke('set-user-role', targetRole);
+            const result = await bridge.invoke('set-user-role', {
+                role: targetRole,
+                authToken
+            });
 
             if (result && result.success) {
                 if (result.status) {

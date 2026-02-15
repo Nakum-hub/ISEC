@@ -255,6 +255,33 @@ Styles for the dashboard cards and metrics with glassmorphism and smooth transit
   font-size: 24px;
 }
 
+.license-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.license-item {
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-backdrop);
+}
+
+.license-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.license-value {
+  margin: 6px 0 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+
 
 /* Responsive design */
 @media (max-width: 768px) {

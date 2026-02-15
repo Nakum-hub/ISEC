@@ -4,6 +4,7 @@ Implements offline digital signing of forensic reports using local keypair
 """
 import os
 import hashlib
+import hmac
 import platform
 import socket
 import getpass
@@ -13,11 +14,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.exceptions import InvalidSignature
 
+from src.utils.paths import get_state_dir, ensure_dir
 
 class DigitalSigner:
     def __init__(self, keys_dir=None):
-        self.keys_dir = keys_dir or os.path.join(os.path.dirname(__file__), "..", "..", "keys")
-        os.makedirs(self.keys_dir, exist_ok=True)
+        default_dir = os.path.join(get_state_dir(), "keys")
+        override_dir = os.environ.get("ISEC_SIGNING_KEYS_DIR")
+        self.keys_dir = keys_dir or override_dir or default_dir
+        ensure_dir(self.keys_dir)
         self.private_key_path = os.path.join(self.keys_dir, "signing_private_key.pem")
         self.public_key_path = os.path.join(self.keys_dir, "signing_public_key.pem")
         
@@ -177,38 +181,113 @@ class DigitalSigner:
             json.dump(signature_record, f, indent=2, sort_keys=True)
 
         return sig_path
-    
-    def verify_signature(self, signature_hex, evidence_db_path, system_fingerprint=None):
+
+    def verify_pdf_signature(self, report_path, signature_path=None, evidence_db_path=None, require_same_host=False):
         """
-        Verify a digital signature
+        Verify a PDF sidecar signature file produced by sign_pdf().
         """
+        checks = {
+            'signatureRecordValid': False,
+            'metadataHashValid': False,
+            'signatureValid': False,
+            'reportHashValid': False,
+            'evidenceDbHashValid': True,
+            'systemFingerprintValid': True
+        }
+
         try:
-            # Regenerate system fingerprint if not provided
-            if system_fingerprint is None:
-                system_data = self._generate_system_fingerprint()
-                system_fingerprint = system_data['fingerprint']
-            
-            # Get evidence database hash
-            evidence_db_hash = self._calculate_file_hash(evidence_db_path)
-            
-            # Reconstruct the expected metadata
-            expected_metadata = {
-                'evidence_db_hash': evidence_db_hash,
-                'system_fingerprint': system_fingerprint,
-                'generation_timestamp': datetime.utcnow().isoformat() + 'Z',  # This won't match exactly
-                'signature_format': 'ISEC_v1'
-            }
-            
-            # For verification purposes, we'll need to verify against the original payload
-            # Since we don't have the original payload, we'll need to store it with the signature
-            # For now, we'll return a basic verification status
+            if not report_path or not os.path.exists(report_path):
+                return {'success': False, 'message': 'Report file not found.', 'checks': checks}
+
+            sig_path = signature_path or (report_path + ".sig.json")
+            if not os.path.exists(sig_path):
+                return {'success': False, 'message': 'Signature file not found.', 'checks': checks}
+
+            with open(sig_path, 'r', encoding='utf-8') as f:
+                record = json.load(f)
+
+            if not isinstance(record, dict):
+                return {'success': False, 'message': 'Signature record is invalid.', 'checks': checks}
+
+            signature_hex = record.get('signature')
+            payload_hash = record.get('payload_hash')
+            metadata = record.get('metadata')
+
+            if not signature_hex or not payload_hash or not isinstance(metadata, dict):
+                return {'success': False, 'message': 'Signature record missing required fields.', 'checks': checks}
+            checks['signatureRecordValid'] = True
+
+            canonical_metadata = json.dumps(metadata, sort_keys=True, separators=(',', ':'))
+            expected_payload_hash = hashlib.sha256(canonical_metadata.encode()).hexdigest()
+            checks['metadataHashValid'] = hmac.compare_digest(expected_payload_hash, payload_hash)
+            if not checks['metadataHashValid']:
+                return {'success': False, 'message': 'Signature payload hash mismatch.', 'checks': checks}
+
             public_key = self._load_public_key()
             signature_bytes = bytes.fromhex(signature_hex)
-            
-            # We need the original payload hash to verify
-            # This would typically be stored with the document
-            return True  # Simplified verification for now
-            
+            try:
+                public_key.verify(
+                    signature_bytes,
+                    payload_hash.encode(),
+                    padding.PKCS1v15(),
+                    hashes.SHA256()
+                )
+                checks['signatureValid'] = True
+            except InvalidSignature:
+                return {'success': False, 'message': 'Digital signature verification failed.', 'checks': checks}
+
+            report_hash = self._calculate_file_hash(report_path)
+            expected_report_hash = metadata.get('report_hash')
+            checks['reportHashValid'] = bool(report_hash and expected_report_hash and hmac.compare_digest(report_hash, expected_report_hash))
+            if not checks['reportHashValid']:
+                return {'success': False, 'message': 'Report hash mismatch.', 'checks': checks}
+
+            if evidence_db_path:
+                expected_db_hash = metadata.get('evidence_db_hash')
+                actual_db_hash = self._calculate_file_hash(evidence_db_path)
+                checks['evidenceDbHashValid'] = bool(expected_db_hash and actual_db_hash and hmac.compare_digest(expected_db_hash, actual_db_hash))
+                if not checks['evidenceDbHashValid']:
+                    return {'success': False, 'message': 'Evidence database hash mismatch.', 'checks': checks}
+
+            if require_same_host:
+                expected_fingerprint = metadata.get('system_fingerprint')
+                current_fingerprint = self._generate_system_fingerprint().get('fingerprint')
+                checks['systemFingerprintValid'] = bool(expected_fingerprint and current_fingerprint and hmac.compare_digest(expected_fingerprint, current_fingerprint))
+                if not checks['systemFingerprintValid']:
+                    return {'success': False, 'message': 'System fingerprint mismatch.', 'checks': checks}
+
+            return {'success': True, 'message': 'Signature verification passed.', 'checks': checks}
+
+        except Exception as e:
+            return {'success': False, 'message': f'Signature verification error: {e}', 'checks': checks}
+    
+    def verify_signature(self, signature_hex, evidence_db_path, system_fingerprint=None, payload_hash=None):
+        """
+        Verify a raw signature against payload hash, or verify PDF sidecar signature.
+        """
+        try:
+            if signature_hex and os.path.exists(signature_hex):
+                result = self.verify_pdf_signature(
+                    report_path=evidence_db_path,
+                    signature_path=signature_hex,
+                    require_same_host=bool(system_fingerprint)
+                )
+                return bool(result.get('success'))
+
+            if not payload_hash:
+                return False
+
+            public_key = self._load_public_key()
+            signature_bytes = bytes.fromhex(signature_hex)
+            public_key.verify(
+                signature_bytes,
+                payload_hash.encode(),
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+            return True
+        except InvalidSignature:
+            return False
         except Exception as e:
             print(f"Signature verification error: {e}")
             return False

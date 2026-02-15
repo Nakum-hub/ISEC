@@ -7,10 +7,13 @@ import hashlib
 import hmac
 import os
 import json
+import base64
 from datetime import datetime
 from cryptography.fernet import Fernet
 import threading
 from contextlib import contextmanager
+
+from src.utils.paths import get_state_file
 
 
 class EvidenceDatabase:
@@ -33,31 +36,169 @@ class EvidenceDatabase:
         """Setup encryption key from environment or create a new one"""
         key_env = os.environ.get('EVIDENCE_ENCRYPTION_KEY')
         if key_env:
-            return key_env.encode()
+            normalized_env_key = self._normalize_fernet_key(key_env)
+            if not normalized_env_key:
+                raise ValueError("EVIDENCE_ENCRYPTION_KEY is invalid. Expected a Fernet-compatible key.")
+            return normalized_env_key
+
+        key_file = os.environ.get('EVIDENCE_ENCRYPTION_KEY_FILE') or self._get_key_file_path("evidence_encryption.key")
+        if key_file and os.path.exists(key_file):
+            try:
+                file_key = self._normalize_fernet_key(self._read_key_file(key_file))
+                if file_key:
+                    return file_key
+                if self._database_has_existing_evidence():
+                    raise ValueError("Stored encryption key is invalid for an existing evidence database.")
+            except ValueError:
+                raise
+            except Exception:
+                pass
+
+        # Preserve compatibility with legacy databases that were encrypted with
+        # deterministic key derivation before key files existed.
+        if self._database_has_existing_evidence():
+            legacy_key = self._legacy_derived_key()
+            if key_file:
+                try:
+                    self._write_key_file(key_file, legacy_key)
+                except Exception:
+                    pass
+            return legacy_key
+
+        # New deployments get a random key persisted outside the DB.
+        new_key = Fernet.generate_key()
+        if key_file:
+            try:
+                self._write_key_file(key_file, new_key)
+            except Exception:
+                pass
+        return new_key
+
+    def _legacy_derived_key(self):
+        """Legacy key derivation (kept for backwards compatibility)."""
+        system_specific_value = (
+            f"isek_db_{os.getuid() if hasattr(os, 'getuid') else os.getcwd()}"
+            if os.name != 'nt'
+            else f"isek_db_{os.environ.get('USERNAME', 'user')}"
+        )
+        key_bytes = hashlib.sha256(system_specific_value.encode()).digest()
+        return base64.urlsafe_b64encode(key_bytes[:32])
+
+    def _get_key_file_path(self, filename):
+        try:
+            return get_state_file(filename, subdir="keys")
+        except Exception:
+            return None
+
+    def _read_key_file(self, path):
+        with open(path, "rb") as f:
+            raw = f.read().strip()
+        return raw
+
+    def _write_key_file(self, path, key_bytes):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(key_bytes)
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+
+    def _normalize_fernet_key(self, raw_value):
+        """Normalize raw key input to a valid Fernet key format."""
+        if raw_value is None:
+            return None
+
+        if isinstance(raw_value, bytes):
+            data = raw_value.strip()
         else:
-            # In a real application, you'd want to securely store this key
-            # For demo purposes, we'll derive it from a system-specific value
-            # and ensure it's properly formatted for Fernet
-            import base64
-            import secrets
-            
-            # Generate a proper 32-byte key for Fernet
-            system_specific_value = f"isek_db_{os.getuid() if hasattr(os, 'getuid') else os.getcwd()}" if os.name != 'nt' else f"isek_db_{os.environ.get('USERNAME', 'user')}"
-            key_bytes = hashlib.sha256(system_specific_value.encode()).digest()
-            # Encode to URL-safe base64 as required by Fernet
-            return base64.urlsafe_b64encode(key_bytes[:32])  # Take exactly 32 bytes
+            data = str(raw_value).strip().encode("utf-8")
+
+        if not data:
+            return None
+
+        # Already a valid Fernet key
+        try:
+            Fernet(data)
+            return data
+        except Exception:
+            pass
+
+        # Attempt to decode key material and convert to Fernet key.
+        decoded = None
+        try:
+            decoded = self._decode_key_material(data.decode("utf-8"))
+        except Exception:
+            decoded = None
+
+        if not decoded:
+            return None
+
+        if len(decoded) != 32:
+            decoded = hashlib.sha256(decoded).digest()
+
+        normalized = base64.urlsafe_b64encode(decoded[:32])
+        try:
+            Fernet(normalized)
+            return normalized
+        except Exception:
+            return None
+
+    def _database_has_existing_evidence(self):
+        """Return True when an evidence table exists and contains records."""
+        if not os.path.exists(self.db_path):
+            return False
+
+        try:
+            if os.path.getsize(self.db_path) <= 0:
+                return False
+        except Exception:
+            return False
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='evidence'")
+                if (cursor.fetchone() or [0])[0] == 0:
+                    return False
+                cursor.execute("SELECT COUNT(*) FROM evidence")
+                evidence_count = (cursor.fetchone() or [0])[0]
+                return evidence_count > 0
+        except Exception:
+            return False
             
     def _get_or_create_master_salt(self):
         """Get existing master salt or create a new one.
 
-        The salt is stored base64-encoded in the metadata table so that it can be
-        round-tripped reliably across processes. Older databases may contain a
-        legacy, non-base64 value; in that case we fall back to using the raw
-        UTF-8 bytes which will typically cause integrity verification to fail,
-        correctly flagging the chain as compromised.
+        Prefer a dedicated key file outside the database. For legacy databases,
+        we fall back to the stored metadata value to preserve the existing
+        hash chain, then persist it to the key file for future runs.
         """
         import base64
         import secrets
+
+        key_env = os.environ.get("ISEC_HMAC_KEY")
+        key_file = os.environ.get("ISEC_HMAC_KEY_FILE") or self._get_key_file_path("evidence_hmac.key")
+
+        if key_env:
+            decoded = self._decode_key_material(key_env)
+            if decoded:
+                if key_file:
+                    try:
+                        self._write_key_file(key_file, base64.b64encode(decoded))
+                    except Exception:
+                        pass
+                return decoded
+
+        if key_file and os.path.exists(key_file):
+            try:
+                raw = self._read_key_file(key_file)
+                try:
+                    return base64.b64decode(raw)
+                except Exception:
+                    return raw
+            except Exception:
+                pass
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -67,7 +208,6 @@ class EvidenceDatabase:
                 if row:
                     stored_value = row[0]
                     if stored_value is None:
-                        # Unlikely, but treat as needing a fresh salt
                         new_salt = secrets.token_bytes(32)
                         encoded = base64.b64encode(new_salt).decode('ascii')
                         cursor.execute(
@@ -77,28 +217,37 @@ class EvidenceDatabase:
                         conn.commit()
                         return new_salt
 
-                    # Try new base64 format first
                     try:
-                        return base64.b64decode(stored_value.encode('ascii'))
+                        decoded = base64.b64decode(stored_value.encode('ascii'))
                     except Exception:
-                        # Legacy format – fall back to UTF-8 bytes
-                        return stored_value.encode('utf-8')
+                        decoded = stored_value.encode('utf-8')
+
+                    if key_file:
+                        try:
+                            self._write_key_file(key_file, base64.b64encode(decoded))
+                        except Exception:
+                            pass
+
+                    return decoded
                 else:
-                    # Create a new master salt and persist in base64 format
-                    new_salt = secrets.token_bytes(32)  # 32 bytes for strong salt
+                    new_salt = secrets.token_bytes(32)
                     encoded = base64.b64encode(new_salt).decode('ascii')
                     cursor.execute(
                         "INSERT INTO metadata (key, value) VALUES (?, ?)",
                         ('master_salt', encoded),
                     )
                     conn.commit()
+                    if key_file:
+                        try:
+                            self._write_key_file(key_file, encoded.encode('ascii'))
+                        except Exception:
+                            pass
                     return new_salt
             except sqlite3.OperationalError:
-                # Metadata table doesn't exist, create it
-                cursor.execute('''CREATE TABLE IF NOT EXISTS metadata (
+                cursor.execute("""CREATE TABLE IF NOT EXISTS metadata (
                                     key TEXT PRIMARY KEY,
                                     value TEXT
-                                )''')
+                                )""")
                 new_salt = secrets.token_bytes(32)
                 encoded = base64.b64encode(new_salt).decode('ascii')
                 cursor.execute(
@@ -106,8 +255,28 @@ class EvidenceDatabase:
                     ('master_salt', encoded),
                 )
                 conn.commit()
+                if key_file:
+                    try:
+                        self._write_key_file(key_file, encoded.encode('ascii'))
+                    except Exception:
+                        pass
                 return new_salt
-    
+
+    def _decode_key_material(self, value):
+        """Decode key material from hex/base64/plain string."""
+        if value is None:
+            return None
+        data = value.strip()
+        try:
+            if all(c in "0123456789abcdefABCDEF" for c in data) and len(data) % 2 == 0:
+                return bytes.fromhex(data)
+        except Exception:
+            pass
+        try:
+            return base64.b64decode(data.encode("utf-8"))
+        except Exception:
+            return data.encode("utf-8")
+
     def _initialize_schema(self):
         """Initialize the database schema with evidence table and blockchain-style features"""
         with self._get_connection() as conn:

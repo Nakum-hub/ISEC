@@ -2,6 +2,7 @@ Offline Update Channel
 ======================
 
 Place an update manifest and installer package in this folder to enable offline updates.
+For packaged builds, use the per-user updates folder in the state directory (e.g. `<state-dir>/updates`).
 
 Required files:
 1. `manifest.json`

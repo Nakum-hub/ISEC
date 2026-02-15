@@ -303,6 +303,15 @@ class ReportGenerator:
                 sig_path = self.digital_signer.sign_pdf(filename, signature_data)
                 if sig_path:
                     print(f"Digital signature file created: {sig_path}")
+                    verification = self.digital_signer.verify_pdf_signature(
+                        report_path=filename,
+                        signature_path=sig_path,
+                        evidence_db_path=self.db_path
+                    )
+                    if verification.get('success'):
+                        print("Digital signature verification passed.")
+                    else:
+                        print(f"WARNING: Signature verification failed: {verification.get('message')}")
             except Exception as exc:
                 print(f"Digital signature failed: {exc}")
         else:
