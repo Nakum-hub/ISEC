@@ -80,7 +80,7 @@ class RetentionEngine:
                     settings = json.loads(row[0])
                     self.policy = RetentionPolicy(settings.get('policy', 'medium_term'))
                     self.retention_days = settings.get('days', 90)
-                except:
+                except (TypeError, ValueError, json.JSONDecodeError):
                     # If parsing fails, use defaults
                     pass
             
@@ -197,13 +197,15 @@ class RetentionEngine:
         try:
             conn = sqlite3.connect(self.storage.db_path)
             cursor = conn.cursor()
-            
-            placeholders = ','.join('?' * len(expired_ids))
-            cursor.execute(f"""
-                UPDATE evidence 
+
+            cursor.executemany(
+                """
+                UPDATE evidence
                 SET retention_status = 'expired'
-                WHERE id IN ({placeholders})
-            """, expired_ids)
+                WHERE id = ?
+                """,
+                [(expired_id,) for expired_id in expired_ids]
+            )
             
             conn.commit()
             conn.close()
@@ -230,27 +232,34 @@ class RetentionEngine:
     
     def prepare_for_deletion(self, evidence_ids):
         """Prepare evidence for deletion with dual confirmation"""
-        if not evidence_ids:
+        normalized_ids = self._normalize_evidence_ids(evidence_ids)
+        if not normalized_ids:
             return {'success': False, 'message': 'No evidence IDs provided'}
         
         try:
             # Verify the evidence exists and is flagged as expired
             conn = sqlite3.connect(self.storage.db_path)
             cursor = conn.cursor()
-            
-            placeholders = ','.join('?' * len(evidence_ids))
-            cursor.execute(f"""
-                SELECT id, evidence_type, timestamp, COALESCE(retention_status, 'active') as retention_status
-                FROM evidence 
-                WHERE id IN ({placeholders})
-            """, evidence_ids)
-            
-            found_records = cursor.fetchall()
+
+            found_records = []
+            for evidence_id in normalized_ids:
+                cursor.execute(
+                    """
+                    SELECT id, evidence_type, timestamp, COALESCE(retention_status, 'active') as retention_status
+                    FROM evidence
+                    WHERE id = ?
+                    """,
+                    (evidence_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    found_records.append(row)
+
             conn.close()
             
             # Check if all requested IDs exist
             found_ids = [record[0] for record in found_records]
-            missing_ids = set(evidence_ids) - set(found_ids)
+            missing_ids = set(normalized_ids) - set(found_ids)
             
             if missing_ids:
                 return {
@@ -268,7 +277,7 @@ class RetentionEngine:
                 }
             
             # Mark for deletion with dual confirmation requirement
-            for evidence_id in evidence_ids:
+            for evidence_id in normalized_ids:
                 deletion_request = {
                     'evidence_id': evidence_id,
                     'requested_by': self.user,
@@ -284,8 +293,8 @@ class RetentionEngine:
             
             return {
                 'success': True,
-                'message': f'Deletion request prepared for {len(evidence_ids)} items. Dual confirmation required.',
-                'evidence_ids': evidence_ids
+                'message': f'Deletion request prepared for {len(normalized_ids)} items. Dual confirmation required.',
+                'evidence_ids': normalized_ids
             }
         except Exception as e:
             print(f"Error preparing for deletion: {e}")
@@ -319,13 +328,14 @@ class RetentionEngine:
 
     def confirm_deletion(self, evidence_ids, confirm_token=None):
         """Confirm deletion with dual confirmation (soft delete)"""
-        if not evidence_ids:
+        normalized_ids = self._normalize_evidence_ids(evidence_ids)
+        if not normalized_ids:
             return {'success': False, 'message': 'No evidence IDs provided'}
         
         try:
             pending_requests = self._load_pending_deletion_requests()
-            pending_ids = [eid for eid in evidence_ids if eid in pending_requests]
-            missing_pending = [eid for eid in evidence_ids if eid not in pending_requests]
+            pending_ids = [eid for eid in normalized_ids if eid in pending_requests]
+            missing_pending = [eid for eid in normalized_ids if eid not in pending_requests]
 
             if missing_pending:
                 return {
@@ -335,15 +345,21 @@ class RetentionEngine:
 
             conn = sqlite3.connect(self.storage.db_path)
             cursor = conn.cursor()
-            
-            placeholders = ','.join('?' * len(pending_ids))
-            cursor.execute(f"""
-                SELECT id, COALESCE(retention_status, 'active') as retention_status
-                FROM evidence
-                WHERE id IN ({placeholders})
-            """, pending_ids)
-            
-            rows = cursor.fetchall()
+
+            rows = []
+            for pending_id in pending_ids:
+                cursor.execute(
+                    """
+                    SELECT id, COALESCE(retention_status, 'active') as retention_status
+                    FROM evidence
+                    WHERE id = ?
+                    """,
+                    (pending_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    rows.append(row)
+
             status_by_id = {row[0]: row[1] for row in rows}
             not_expired = [eid for eid in pending_ids if status_by_id.get(eid) != 'expired']
             if not_expired:
@@ -353,11 +369,14 @@ class RetentionEngine:
                     'message': f'Evidence IDs not expired or already deleted: {not_expired}'
                 }
 
-            cursor.execute(f"""
+            cursor.executemany(
+                """
                 UPDATE evidence
                 SET retention_status = 'deleted'
-                WHERE id IN ({placeholders})
-            """, pending_ids)
+                WHERE id = ?
+                """,
+                [(pending_id,) for pending_id in pending_ids]
+            )
             
             conn.commit()
             conn.close()
@@ -391,6 +410,25 @@ class RetentionEngine:
         except Exception as e:
             print(f"Error confirming deletion: {e}")
             return {'success': False, 'message': str(e)}
+
+    def _normalize_evidence_ids(self, evidence_ids):
+        """Normalize list-like IDs to unique positive integers."""
+        normalized = []
+        seen = set()
+        if not isinstance(evidence_ids, (list, tuple, set)):
+            return normalized
+
+        for raw_id in evidence_ids:
+            try:
+                evidence_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if evidence_id <= 0 or evidence_id in seen:
+                continue
+            seen.add(evidence_id)
+            normalized.append(evidence_id)
+
+        return normalized
     
     def get_retention_status(self):
         """Get the current retention status"""

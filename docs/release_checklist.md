@@ -3,6 +3,8 @@
 ## 1. Test and Coverage Gates
 
 - [ ] `python -m pip install -r requirements-dev.txt`
+- [ ] `python -m pip_audit -r requirements.txt` (no known vulnerabilities)
+- [ ] `cd ui && npm audit --audit-level=moderate` (0 vulnerabilities)
 - [ ] `python -m pytest`
 - [ ] `python scripts/enforce_coverage.py --coverage-json coverage/coverage.json`
 - [ ] Coverage is >= 85% for:

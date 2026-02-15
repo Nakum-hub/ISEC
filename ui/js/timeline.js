@@ -7,6 +7,21 @@ function getIsecBridge() {
   return window.isec;
 }
 
+function escapeHtml(value) {
+  const raw = String(value == null ? '' : value);
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeClassToken(value, fallback = 'unknown') {
+  const token = String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return token || fallback;
+}
+
 let timelineRefreshTimer = null;
 
 async function initializeTimeline() {
@@ -92,28 +107,39 @@ function renderTimeline(timelineItems) {
     const timelineItem = document.createElement('div');
     timelineItem.className = 'timeline-item';
     timelineItem.style.animationDelay = `${index * 0.1}s`;
-    
+
+    const itemData = item && typeof item === 'object' ? item : {};
+    const itemType = formatEvidenceType(itemData.type || '');
+    const itemDescription = itemData.description || 'No description';
+    const itemTimestamp = itemData.timestamp || '';
+    const itemDataObj = (itemData.data && typeof itemData.data === 'object') ? itemData.data : {};
+    const entriesText = Number.isFinite(itemDataObj.entries) ? `(${itemDataObj.entries} entries)` : '';
+    const connectionsText = Number.isFinite(itemDataObj.connections) ? `(${itemDataObj.connections} connections)` : '';
+    const filesText = Number.isFinite(itemDataObj.files) ? `(${itemDataObj.files} files)` : '';
+    const severityText = formatSeverity(itemData.severity || '');
+    const dateText = itemTimestamp ? new Date(itemTimestamp).toLocaleDateString() : 'N/A';
+
     timelineItem.innerHTML = `
       <div class="timeline-marker"></div>
       <div class="timeline-content">
-        <div class="timeline-type type-${item.type}">${formatEvidenceType(item.type)}</div>
-        <div class="timeline-title">${item.description}</div>
+        <div class="timeline-type type-${sanitizeClassToken(itemData.type)}">${escapeHtml(itemType)}</div>
+        <div class="timeline-title">${escapeHtml(itemDescription)}</div>
         <div class="timeline-description">
-          Collected ${formatDate(item.timestamp)}
-          ${item.data.entries ? `(${item.data.entries} entries)` : ''}
-          ${item.data.connections ? `(${item.data.connections} connections)` : ''}
-          ${item.data.files ? `(${item.data.files} files)` : ''}
+          Collected ${escapeHtml(itemTimestamp ? formatDate(itemTimestamp) : 'Unknown')}
+          ${escapeHtml(entriesText)}
+          ${escapeHtml(connectionsText)}
+          ${escapeHtml(filesText)}
         </div>
         <div class="timeline-meta">
-          <span>${formatSeverity(item.severity)}</span>
-          <span>${new Date(item.timestamp).toLocaleDateString()}</span>
+          <span>${escapeHtml(severityText)}</span>
+          <span>${escapeHtml(dateText)}</span>
         </div>
       </div>
     `;
 
     timelineItem.addEventListener('click', () => {
       if (typeof setSelectedEvidenceId === 'function') {
-        setSelectedEvidenceId(item.id);
+        setSelectedEvidenceId(itemData.id);
       }
       const detailNav = document.querySelector('[data-view="detail"]');
       if (detailNav) {

@@ -5,6 +5,8 @@ Captures network connection snapshots from the host system
 import subprocess
 import platform
 import re
+import os
+import shutil
 from datetime import datetime
 
 
@@ -14,6 +16,34 @@ class NetworkConnectionsCollector:
         self.actor = actor
         self.workstation_id = workstation_id
         self.ip_address = ip_address
+        self.windows_netstat = self._resolve_windows_netstat()
+        self.unix_netstat = self._resolve_unix_command("netstat")
+        self.unix_ss = self._resolve_unix_command("ss")
+
+    def _resolve_windows_netstat(self):
+        system_root = os.environ.get("SystemRoot", r"C:\Windows")
+        candidates = [
+            os.path.join(system_root, "System32", "netstat.exe"),
+            os.path.join(system_root, "Sysnative", "netstat.exe"),
+        ]
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        resolved = shutil.which("netstat")
+        return resolved if resolved and os.path.isabs(resolved) else None
+
+    def _resolve_unix_command(self, name):
+        candidates = [
+            f"/usr/sbin/{name}",
+            f"/usr/bin/{name}",
+            f"/bin/{name}",
+            f"/sbin/{name}",
+        ]
+        for candidate in candidates:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+        resolved = shutil.which(name)
+        return resolved if resolved and os.path.isabs(resolved) else None
     
     def collect(self):
         """Collect network connection information"""
@@ -63,9 +93,13 @@ class NetworkConnectionsCollector:
         connections = []
         
         try:
+            if not self.windows_netstat:
+                print("netstat executable not found in trusted system paths")
+                return connections
+
             # Run netstat command to get active connections
             result = subprocess.run(
-                ["netstat", "-an", "-p", "TCP"], 
+                [self.windows_netstat, "-an", "-p", "TCP"],
                 capture_output=True, 
                 text=True, 
                 timeout=30
@@ -129,13 +163,22 @@ class NetworkConnectionsCollector:
         
         try:
             # Try to use netstat first, fall back to ss if not available
-            cmd = ["netstat", "-tuln"]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if not self.unix_netstat and not self.unix_ss:
+                print("No trusted network tools found (netstat/ss)")
+                return connections
+
+            result = None
             used_ss = False
+
+            if self.unix_netstat:
+                cmd = [self.unix_netstat, "-tuln"]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            else:
+                result = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="")
             
             # If netstat fails, try ss command
-            if result.returncode != 0:
-                cmd = ["ss", "-tuln"]
+            if result.returncode != 0 and self.unix_ss:
+                cmd = [self.unix_ss, "-tuln"]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 used_ss = True
             

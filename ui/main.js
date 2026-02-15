@@ -271,6 +271,23 @@ function getStoragePaths() {
   return { baseDir, evidenceDir, reportsDir, exportsDir };
 }
 
+function resolveSafeDirectoryPath(baseDir, candidatePath) {
+  const fallback = path.resolve(baseDir);
+  if (!candidatePath || typeof candidatePath !== 'string') {
+    return fallback;
+  }
+
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedCandidate = path.resolve(candidatePath);
+  const relative = path.relative(resolvedBase, resolvedCandidate);
+  const isInsideBase = relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+
+  if (!isInsideBase) {
+    return fallback;
+  }
+  return resolvedCandidate;
+}
+
 function isLikelyPythonErrorLine(line) {
   const normalized = String(line || '').toLowerCase();
   if (!normalized) {
@@ -958,7 +975,8 @@ ipcMain.handle('export-evidence', async (event, options) => {
     }
 
     const storagePaths = getStoragePaths();
-    const exportDir = (options && options.exportDir) ? options.exportDir : storagePaths.exportsDir;
+    const requestedExportDir = options && typeof options === 'object' ? options.exportDir : null;
+    const exportDir = resolveSafeDirectoryPath(storagePaths.exportsDir, requestedExportDir);
     const res = await runPythonAction('export', ['--export-dir', exportDir]);
     const json = res.json;
     if (json && json.status) {

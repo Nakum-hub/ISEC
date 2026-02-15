@@ -23,6 +23,29 @@ async function invokeIsec(channel, ...args) {
 let currentUserRole = null;
 let userPermissions = [];
 
+function escapeHtml(value) {
+    const raw = String(value == null ? '' : value);
+    return raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeClassToken(value, fallback = 'unknown') {
+    const token = String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    return token || fallback;
+}
+
+function toSafeId(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return parsed;
+}
+
 // Initialize the evidence viewer
 document.addEventListener('DOMContentLoaded', function() {
     loadUserRole();
@@ -91,8 +114,8 @@ function updateUIForRole() {
     // Update role indicator
     const roleIndicator = document.getElementById('role-indicator');
     if (roleIndicator) {
-        roleIndicator.innerHTML = `<span>Role: ${currentUserRole}</span>`;
-        roleIndicator.className = `status-badge role-${currentUserRole}`;
+        roleIndicator.textContent = `Role: ${currentUserRole || 'unknown'}`;
+        roleIndicator.className = `status-badge role-${sanitizeClassToken(currentUserRole)}`;
     }
 
     const roleSelect = document.getElementById('role-select');
@@ -241,13 +264,13 @@ async function updateIntegrityStatus() {
         
         if (integrityData.status === 'valid') {
             integrityStatus.className = 'status-badge status-integrity-valid';
-            integrityStatus.innerHTML = '<span>Integrity: Valid</span>';
+            integrityStatus.textContent = 'Integrity: Valid';
         } else if (integrityData.status === 'compromised') {
             integrityStatus.className = 'status-badge status-integrity-danger';
-            integrityStatus.innerHTML = '<span>Integrity: Compromised</span>';
+            integrityStatus.textContent = 'Integrity: Compromised';
         } else {
             integrityStatus.className = 'status-badge status-integrity-warning';
-            integrityStatus.innerHTML = '<span>Integrity: Warning</span>';
+            integrityStatus.textContent = 'Integrity: Warning';
         }
     } catch (error) {
         console.error('Error updating integrity status:', error);
@@ -380,28 +403,40 @@ function createTimelineSection(date, items) {
 function createTimelineItem(item) {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'timeline-item';
-    itemDiv.dataset.id = item.id;
+    const safeId = toSafeId(item && item.id);
+    if (safeId !== null) {
+        itemDiv.dataset.id = String(safeId);
+    }
     
     // Determine icon based on evidence type
     const icon = getEvidenceIcon(item.type);
+    const typeText = String(item && item.type ? item.type : '').replace(/_/g, ' ').toUpperCase();
+    const timestampText = item && item.timestamp ? formatTimestamp(item.timestamp) : 'N/A';
+    const summaryText = item && item.description ? item.description : 'No description';
+    const severityText = item && item.severity ? item.severity : 'unknown';
+    const deleteButton = (userPermissions.includes('modify') && safeId !== null)
+        ? `<button class="btn btn-sm btn-danger delete-evidence" onclick="deleteEvidence(${safeId})">Delete</button>`
+        : '';
+    const viewButton = safeId !== null
+        ? `<button class="btn btn-sm view-details" onclick="showEvidenceDetails(${safeId})">View Details</button>`
+        : '<button class="btn btn-sm view-details" disabled title="Invalid evidence id">View Details</button>';
     
     itemDiv.innerHTML = `
         <div class="timeline-icon">${icon}</div>
         <div class="timeline-content">
             <div class="timeline-header">
-                <span class="evidence-type">${item.type.replace('_', ' ').toUpperCase()}</span>
-                <span class="timestamp">${formatTimestamp(item.timestamp)}</span>
+                <span class="evidence-type">${escapeHtml(typeText)}</span>
+                <span class="timestamp">${escapeHtml(timestampText)}</span>
             </div>
             <div class="timeline-body">
-                <div class="evidence-summary">${item.description}</div>
+                <div class="evidence-summary">${escapeHtml(summaryText)}</div>
                 <div class="chain-of-custody">
-                    <span class="severity">Severity: ${item.severity}</span>
+                    <span class="severity">Severity: ${escapeHtml(severityText)}</span>
                 </div>
             </div>
             <div class="timeline-actions">
-                <button class="btn btn-sm view-details" onclick="showEvidenceDetails(${item.id})">View Details</button>
-                ${userPermissions.includes('modify') ? 
-                    `<button class="btn btn-sm btn-danger delete-evidence" onclick="deleteEvidence(${item.id})">Delete</button>` : ''}
+                ${viewButton}
+                ${deleteButton}
             </div>
         </div>
     `;
@@ -441,6 +476,17 @@ async function showEvidenceDetails(evidenceId) {
             showError('Evidence not found');
             return;
         }
+        const safeId = toSafeId(evidenceData.id);
+        const safeType = escapeHtml(evidenceData.type || 'unknown');
+        const safeTimestamp = escapeHtml(evidenceData.timestamp ? formatTimestamp(evidenceData.timestamp) : 'N/A');
+        const safeDescription = escapeHtml(evidenceData.description || 'No description');
+        const safeSeverity = escapeHtml(evidenceData.severity || 'unknown');
+        const safeDataJson = escapeHtml(JSON.stringify(evidenceData.data || {}, null, 2));
+        const integrityClass = evidenceData.severity === 'critical' ? 'status-invalid' : 'status-valid';
+        const integrityLabel = evidenceData.severity === 'critical' ? 'COMPROMISED' : 'VALID';
+        const safeDeleteAction = (userPermissions.includes('modify') && safeId !== null)
+            ? `<button class="btn btn-danger" onclick="confirmDeleteEvidence(${safeId})">Delete Evidence</button>`
+            : '';
         
         const modal = document.createElement('div');
         modal.className = 'modal';
@@ -452,27 +498,26 @@ async function showEvidenceDetails(evidenceId) {
                 </div>
                 <div class="modal-body">
                     <div class="evidence-detail">
-                        <h4>Type: ${evidenceData.type}</h4>
-                        <p><strong>ID:</strong> ${evidenceData.id}</p>
-                        <p><strong>Timestamp:</strong> ${formatTimestamp(evidenceData.timestamp)}</p>
-                        <p><strong>Description:</strong> ${evidenceData.description}</p>
-                        <p><strong>Severity:</strong> ${evidenceData.severity}</p>
+                        <h4>Type: ${safeType}</h4>
+                        <p><strong>ID:</strong> ${safeId !== null ? safeId : 'N/A'}</p>
+                        <p><strong>Timestamp:</strong> ${safeTimestamp}</p>
+                        <p><strong>Description:</strong> ${safeDescription}</p>
+                        <p><strong>Severity:</strong> ${safeSeverity}</p>
                         
                         <h5>Data:</h5>
-                        <pre class="evidence-data">${JSON.stringify(evidenceData.data, null, 2)}</pre>
+                        <pre class="evidence-data">${safeDataJson}</pre>
                         
                         <h5>Chain of Custody:</h5>
                         <p><strong>Integrity Status:</strong> 
-                            <span class="${evidenceData.severity === 'critical' ? 'status-invalid' : 'status-valid'}">
-                                ${evidenceData.severity === 'critical' ? 'COMPROMISED' : 'VALID'}
+                            <span class="${integrityClass}">
+                                ${integrityLabel}
                             </span>
                         </p>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn" onclick="closeModal()">Close</button>
-                    ${userPermissions.includes('modify') ? 
-                        `<button class="btn btn-danger" onclick="confirmDeleteEvidence(${evidenceData.id})">Delete Evidence</button>` : ''}
+                    ${safeDeleteAction}
                 </div>
             </div>
         `;
@@ -668,11 +713,11 @@ async function loadCurrentRetentionStatus() {
         
         const statusDiv = document.getElementById('current-retention-status');
         statusDiv.innerHTML = `
-            <p><strong>Policy:</strong> ${status.policy}</p>
-            <p><strong>Retention Days:</strong> ${status.retention_days}</p>
-            <p><strong>Total Evidence:</strong> ${status.total_evidence}</p>
-            <p><strong>Active Evidence:</strong> ${status.active_evidence}</p>
-            <p><strong>Expired Evidence:</strong> ${status.expired_evidence}</p>
+            <p><strong>Policy:</strong> ${escapeHtml(status.policy)}</p>
+            <p><strong>Retention Days:</strong> ${escapeHtml(status.retention_days)}</p>
+            <p><strong>Total Evidence:</strong> ${escapeHtml(status.total_evidence)}</p>
+            <p><strong>Active Evidence:</strong> ${escapeHtml(status.active_evidence)}</p>
+            <p><strong>Expired Evidence:</strong> ${escapeHtml(status.expired_evidence)}</p>
         `;
     } catch (error) {
         console.error('Error loading retention status:', error);

@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 import tempfile
+import shutil
 from datetime import datetime
 
 
@@ -15,6 +16,24 @@ class SystemLogsCollector:
         self.actor = actor
         self.workstation_id = workstation_id
         self.ip_address = ip_address
+        self.powershell_path = self._resolve_powershell()
+
+    def _resolve_powershell(self):
+        system_root = os.environ.get("SystemRoot", r"C:\Windows")
+        candidates = [
+            os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+            os.path.join(system_root, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+        ]
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        resolved = shutil.which("powershell")
+        if resolved and os.path.isabs(resolved):
+            return resolved
+        resolved_pwsh = shutil.which("pwsh")
+        if resolved_pwsh and os.path.isabs(resolved_pwsh):
+            return resolved_pwsh
+        return None
     
     def collect(self):
         """Collect system logs based on the operating system"""
@@ -64,9 +83,13 @@ class SystemLogsCollector:
         logs = []
         
         try:
+            if not self.powershell_path:
+                print("PowerShell executable not found in trusted system paths")
+                return logs
+
             # Try to use PowerShell to get recent events
             cmd = [
-                "powershell", 
+                self.powershell_path, 
                 "-Command", 
                 "Get-WinEvent -LogName System -MaxEvents 50 | Select-Object TimeCreated, Id, LevelDisplayName, Message | ConvertTo-Json"
             ]

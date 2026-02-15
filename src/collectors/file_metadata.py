@@ -5,6 +5,7 @@ Collects metadata from selected files and directories
 import os
 import stat
 import platform
+import tempfile
 from datetime import datetime
 
 
@@ -32,7 +33,7 @@ class FileMetadataCollector:
                 '/home',
                 '/etc',
                 '/var/log',
-                '/tmp'
+                tempfile.gettempdir()
             ]
         
         all_metadata = []
@@ -156,5 +157,5 @@ class FileMetadataCollector:
             else:
                 # On Windows, return a placeholder since getting owner requires additional libraries
                 return "SYSTEM"  # Simplified for Windows
-        except:
+        except Exception:
             return "unknown"

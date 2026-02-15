@@ -512,13 +512,34 @@ class EvidenceDatabase:
     
     def get_all_evidence(self, include_expired=False, include_deleted=False):
         """Retrieve evidence records, optionally including expired/deleted items"""
-        filters = []
-        if not include_deleted:
-            filters.append("COALESCE(retention_status, 'active') != 'deleted'")
-        if not include_expired:
-            filters.append("COALESCE(retention_status, 'active') != 'expired'")
-        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
-        query = f"SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address FROM evidence{where_clause} ORDER BY timestamp DESC"
+        if include_deleted and include_expired:
+            query = (
+                "SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address "
+                "FROM evidence ORDER BY timestamp DESC"
+            )
+        elif include_deleted and not include_expired:
+            query = (
+                "SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address "
+                "FROM evidence "
+                "WHERE COALESCE(retention_status, 'active') != 'expired' "
+                "ORDER BY timestamp DESC"
+            )
+        elif not include_deleted and include_expired:
+            query = (
+                "SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address "
+                "FROM evidence "
+                "WHERE COALESCE(retention_status, 'active') != 'deleted' "
+                "ORDER BY timestamp DESC"
+            )
+        else:
+            query = (
+                "SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address "
+                "FROM evidence "
+                "WHERE COALESCE(retention_status, 'active') != 'deleted' "
+                "AND COALESCE(retention_status, 'active') != 'expired' "
+                "ORDER BY timestamp DESC"
+            )
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query)

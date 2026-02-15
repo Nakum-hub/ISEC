@@ -125,8 +125,8 @@ For the packaged Electron app, the updates folder is located under the state dir
 Backend logging defaults to `<output-dir>/isec.log`. Customize with `--log-file` and `--log-level`, or disable with `--no-log-file`.
 
 UI logs are written to the Electron userData directory:
-- Windows: `%APPDATA%\\ISEC\\logs\\isec-ui.log`
-- Linux: `~/.config/ISEC/logs/isec-ui.log`
+- Windows: `%APPDATA%\\isec-desktop-app\\logs\\isec-ui.log`
+- Linux: `~/.config/isec-desktop-app/logs/isec-ui.log`
 
 ## Automated Tests
 
@@ -136,7 +136,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Run the release quality gate (tests + coverage threshold enforcement):
+Run the release quality gate (dependency audit + tests + coverage threshold enforcement):
 ```bash
 python scripts/run_quality_gate.py
 ```

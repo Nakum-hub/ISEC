@@ -1,7 +1,7 @@
 # Dependencies for Internal Security Evidence Collector
 PyPDF2==2.12.1
 reportlab==4.0.4
-cryptography==41.0.7
-cffi==1.17.1
+cryptography==46.0.5
+cffi==2.0.0
 pycparser==2.22
-Pillow==10.1.0
+Pillow==12.1.1
