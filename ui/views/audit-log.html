@@ -1,0 +1,86 @@
+<section id="audit-log" class="view">
+  <div class="section-header scan-header mb-20">
+    <div>
+      <div class="section-title">Audit Log</div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">Immutable System Action History</div>
+    </div>
+    <div class="section-actions">
+      <button class="btn btn-secondary" id="audit-export-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+      <button class="btn btn-primary" id="audit-refresh-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+    <div class="glassmorphism" style="padding:14px 16px;">
+      <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Total Events</div>
+      <div id="audit-total" style="font-family:var(--font-mono);font-size:1.4rem;font-weight:700;color:var(--cyan-bright);">—</div>
+    </div>
+    <div class="glassmorphism" style="padding:14px 16px;">
+      <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Collections</div>
+      <div id="audit-collections" style="font-family:var(--font-mono);font-size:1.4rem;font-weight:700;color:var(--success);">—</div>
+    </div>
+    <div class="glassmorphism" style="padding:14px 16px;">
+      <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Reports Gen.</div>
+      <div id="audit-reports" style="font-family:var(--font-mono);font-size:1.4rem;font-weight:700;color:var(--purple);">—</div>
+    </div>
+    <div class="glassmorphism" style="padding:14px 16px;">
+      <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Alerts</div>
+      <div id="audit-alerts" style="font-family:var(--font-mono);font-size:1.4rem;font-weight:700;color:var(--danger);">—</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="glassmorphism" style="padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <div class="search-input-wrapper" style="flex:1;min-width:200px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="search" id="audit-search" placeholder="Filter audit events…" style="padding-left:32px;">
+    </div>
+    <select id="audit-action-filter" style="width:150px;">
+      <option value="all">All Actions</option>
+      <option value="collection">Collection</option>
+      <option value="report">Report</option>
+      <option value="export">Export</option>
+      <option value="auth">Auth</option>
+      <option value="integrity">Integrity</option>
+      <option value="system">System</option>
+    </select>
+    <select id="audit-sort" style="width:140px;">
+      <option value="desc">Newest First</option>
+      <option value="asc">Oldest First</option>
+    </select>
+    <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);white-space:nowrap;" id="audit-count">0 events</span>
+  </div>
+
+  <!-- Log Table -->
+  <div class="glassmorphism" style="overflow:hidden;">
+    <table class="data-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th style="width:44px;">#</th>
+          <th style="width:160px;">Timestamp</th>
+          <th style="width:110px;">Action</th>
+          <th>Description</th>
+          <th style="width:100px;">Actor</th>
+          <th style="width:90px;">Result</th>
+        </tr>
+      </thead>
+      <tbody id="audit-log-body">
+        <tr><td colspan="6" style="text-align:center;padding:40px;"><div class="spinner" style="width:24px;height:24px;margin:0 auto;"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div id="audit-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:20px;" class="hidden">
+    <button class="btn btn-secondary" id="audit-page-prev" style="padding:6px 16px;">← Prev</button>
+    <span id="audit-page-info" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);"></span>
+    <button class="btn btn-secondary" id="audit-page-next" style="padding:6px 16px;">Next →</button>
+  </div>
+</section>

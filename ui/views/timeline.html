@@ -1,21 +1,96 @@
 <section id="timeline" class="view">
-    <div class="timeline-header">
-        <h1>Evidence Timeline</h1>
-        <div class="timeline-filters">
-            <select id="timeline-filter">
-                <option value="all">All Evidence</option>
-                <option value="system_logs">System Logs</option>
-                <option value="browser_history">Browser History</option>
-                <option value="network_connections">Network Connections</option>
-                <option value="file_metadata">File Metadata</option>
-            </select>
-        </div>
+  <!-- Header -->
+  <div class="section-header scan-header mb-20">
+    <div>
+      <div class="section-title">Evidence Timeline</div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">
+        Immutable Forensic Chain of Custody
+      </div>
+    </div>
+    <div class="section-actions">
+      <button class="btn btn-secondary" id="timeline-export-btn" title="Export timeline">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <button class="btn btn-primary" id="timeline-refresh-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters & Search Row -->
+  <div class="glassmorphism" style="padding:16px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center;">
+      <!-- Search -->
+      <div class="search-input-wrapper">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="search" id="timeline-search" placeholder="Search evidence descriptions, IPs, file paths…" style="padding-left:36px;">
+      </div>
+      <!-- Date From -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;white-space:nowrap;">From</label>
+        <input type="date" id="timeline-from" style="width:140px;color-scheme:dark;">
+      </div>
+      <!-- Date To -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;white-space:nowrap;">To</label>
+        <input type="date" id="timeline-to" style="width:140px;color-scheme:dark;">
+      </div>
+      <!-- Sort -->
+      <select id="timeline-sort" style="width:130px;">
+        <option value="desc">Newest First</option>
+        <option value="asc">Oldest First</option>
+      </select>
     </div>
 
-    <div class="timeline-container">
-        <div class="timeline-line"></div>
-        <div id="timeline-items">
-            <!-- Timeline items will be populated dynamically -->
-        </div>
+    <!-- Type Filter Pills -->
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+      <span style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);text-transform:uppercase;">Filter:</span>
+      <button class="filter-pill active" data-type="all">All</button>
+      <button class="filter-pill" data-type="system_logs" style="--pill-color:#64b5f6;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+        System Logs
+      </button>
+      <button class="filter-pill" data-type="browser_history" style="--pill-color:#69f0ae;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+        Browser
+      </button>
+      <button class="filter-pill" data-type="network_connections" style="--pill-color:#ffd740;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4"/></svg>
+        Network
+      </button>
+      <button class="filter-pill" data-type="file_metadata" style="--pill-color:#ce93d8;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/></svg>
+        Files
+      </button>
+      <button class="filter-pill" data-severity="critical" style="--pill-color:#ff1744;">🔴 Critical</button>
+      <button class="filter-pill" data-severity="high"     style="--pill-color:#ff6d00;">🟠 High</button>
+      <button class="filter-pill" data-severity="medium"   style="--pill-color:#ffd600;">🟡 Medium</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);" id="timeline-count">0 items</span>
+        <button class="btn btn-secondary" id="clear-filters-btn" style="padding:4px 10px;font-size:0.65rem;">Clear</button>
+      </div>
     </div>
+  </div>
+
+  <!-- Timeline Container -->
+  <div id="timeline-items-wrapper">
+    <div id="timeline-items" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div id="timeline-loading" class="empty-state">
+      <div class="spinner" style="width:28px;height:28px;"></div>
+      <span>Loading evidence chain…</span>
+    </div>
+    <div id="timeline-empty" class="empty-state hidden">
+      <div class="empty-state-icon">🔍</div>
+      <span>No evidence matches your filters</span>
+      <button class="btn btn-secondary" onclick="document.getElementById('clear-filters-btn').click()" style="margin-top:8px;font-size:0.75rem;">Clear Filters</button>
+    </div>
+    <!-- Pagination -->
+    <div id="timeline-pagination" class="hidden" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:24px;padding-bottom:8px;">
+      <button class="btn btn-secondary" id="page-prev-btn" style="padding:6px 16px;">← Prev</button>
+      <div id="page-info" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);"></div>
+      <button class="btn btn-secondary" id="page-next-btn" style="padding:6px 16px;">Next →</button>
+    </div>
+  </div>
 </section>

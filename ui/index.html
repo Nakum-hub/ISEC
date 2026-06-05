@@ -1,201 +1,295 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' file:">
-    <title>ISEC - Internal Security Evidence Collector</title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/dashboard.css">
-    <link rel="stylesheet" href="css/timeline.css">
-    <link rel="stylesheet" href="css/detail-view.css">
-    <link rel="stylesheet" href="css/report-export.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' file:">
+  <title>ISEC — Internal Security Evidence Collector</title>
+
+  <!-- Core Styles -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/timeline.css">
+  <link rel="stylesheet" href="css/detail-view.css">
+  <link rel="stylesheet" href="css/report-export.css">
 </head>
-
 <body>
-    <!-- Custom Window Controls -->
-    <div class="window-controls">
-        <div class="window-title">ISEC - Internal Security Evidence Collector</div>
-        <div class="control-buttons">
-            <button id="minimize-window-btn" class="control-btn minimize-btn">−</button>
-            <button id="maximize-window-btn" class="control-btn maximize-btn">□</button>
-            <button id="close-window-btn" class="control-btn close-btn">×</button>
-        </div>
+
+  <!-- ── Window Controls ─────────────────────────────────────── -->
+  <div class="window-controls">
+    <div class="window-title" style="display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--cyan-bright);letter-spacing:0.2em;font-weight:700;">ISEC</span>
+      <span style="color:var(--text-muted);font-size:9px;letter-spacing:0.1em;">v2.0</span>
+    </div>
+    <div style="flex:1;display:flex;justify-content:center;">
+      <div id="top-integrity-bar" style="display:flex;align-items:center;gap:6px;">
+        <div id="top-chain-dot" style="width:5px;height:5px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);animation:pulse-success 2s ease-in-out infinite;"></div>
+        <span id="top-chain-label" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;">Chain Intact</span>
+        <span style="color:var(--border-dim);">│</span>
+        <span id="top-evidence-label" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;">0 Evidence Items</span>
+      </div>
+    </div>
+    <div class="control-buttons">
+      <button id="minimize-window-btn" class="control-btn minimize-btn" title="Minimize">−</button>
+      <button id="maximize-window-btn" class="control-btn maximize-btn" title="Maximize">⬜</button>
+      <button id="close-window-btn"    class="control-btn close-btn"    title="Close">×</button>
+    </div>
+  </div>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <div class="logo-section">
+      <div class="logo">ISEC</div>
+      <div class="app-name">Evidence Collector</div>
     </div>
 
-    <!-- Sidebar Navigation -->
-    <nav class="sidebar">
-        <div class="logo-section">
-            <div class="logo">ISEC</div>
-            <div class="app-name">Evidence Collector</div>
+    <ul class="nav-menu" id="nav-menu">
+      <li class="nav-item active" data-view="dashboard">
+        <div class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         </div>
+        <span>Dashboard</span>
+      </li>
+      <li class="nav-item" data-view="timeline">
+        <div class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="6" x2="21" y2="6"/><circle cx="8" cy="6" r="2" fill="currentColor"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="16" cy="12" r="2" fill="currentColor"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="11" cy="18" r="2" fill="currentColor"/></svg>
+        </div>
+        <span>Evidence Timeline</span>
+      </li>
+      <li class="nav-item" data-view="threat-analysis">
+        <div class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span>Threat Analysis</span>
+        <div class="nav-badge" id="threat-badge" style="display:none;">!</div>
+      </li>
+      <li class="nav-item" data-view="audit-log">
+        <div class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <span>Audit Log</span>
+      </li>
+      <li class="nav-item" data-view="report">
+        <div class="nav-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <span>Report Export</span>
+      </li>
+    </ul>
 
-        <ul class="nav-menu">
-            <li class="nav-item active" data-view="dashboard">
-                <i class="icon dashboard-icon"></i>
-                <span>Dashboard</span>
-            </li>
-            <li class="nav-item" data-view="timeline">
-                <i class="icon timeline-icon"></i>
-                <span>Evidence Timeline</span>
-            </li>
-            <li class="nav-item" data-view="detail">
-                <i class="icon detail-icon"></i>
-                <span>Evidence Details</span>
-            </li>
-            <li class="nav-item" data-view="report">
-                <i class="icon report-icon"></i>
-                <span>Report Export</span>
-            </li>
-        </ul>
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+      <div class="user-profile" style="position:relative;">
+        <button id="profile-btn" class="user-profile-btn" type="button" aria-expanded="false" aria-controls="profile-panel">
+          <div class="user-avatar" id="user-avatar-icon">👤</div>
+          <div class="user-info">
+            <div class="user-name" id="profile-name">Local User</div>
+            <div class="user-role" id="current-role-label">Loading…</div>
+          </div>
+          <span class="profile-caret">▾</span>
+        </button>
 
-        <div class="sidebar-footer">
-        <div class="user-profile">
-            <button id="profile-btn" class="user-profile-btn" type="button" aria-expanded="false" aria-controls="profile-panel">
-                <div class="user-avatar" data-role="unknown">👤</div>
-                <div class="user-info">
-                    <div class="user-name" id="profile-name">Local User</div>
-                    <div class="user-role" id="current-role-label">Loading...</div>
-                </div>
-                <span class="profile-caret">▾</span>
+        <!-- Profile Panel -->
+        <div id="profile-panel" class="profile-panel hidden" role="dialog" aria-label="User profile">
+          <div class="profile-panel-header">
+            <span>Session Profile</span>
+            <button class="profile-close-btn" id="profile-close-btn" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="profile-panel-body">
+            <div class="profile-row"><span class="profile-label">Role</span><span class="profile-value" id="profile-role">—</span></div>
+            <div class="profile-row"><span class="profile-label">Permissions</span><span class="profile-value" id="profile-permissions">—</span></div>
+            <div class="profile-row"><span class="profile-label">License</span><span class="profile-value" id="profile-license">—</span></div>
+            <div class="profile-row"><span class="profile-label">Evidence</span><span class="profile-value" id="profile-evidence-count">—</span></div>
+            <div class="profile-row"><span class="profile-label">Retention</span><span class="profile-value" id="profile-retention">—</span></div>
+            <div class="profile-row"><span class="profile-label">Integrity</span><span class="profile-value" id="profile-integrity">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="role-controls">
+        <select id="role-select" class="role-select">
+          <option value="collector">Collector</option>
+          <option value="reviewer">Reviewer</option>
+          <option value="exporter">Exporter</option>
+        </select>
+        <button class="btn btn-secondary btn-icon-only" id="switch-role-btn" title="Switch Role" style="font-size:13px;">⟳</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main Content ──────────────────────────────────────────── -->
+  <main class="main-content" id="main-content">
+
+    <!-- Dashboard view injected here -->
+    <div id="dashboard-container"></div>
+
+    <!-- Timeline view injected here -->
+    <div id="timeline-container"></div>
+
+    <!-- Threat Analysis view injected here -->
+    <div id="threat-analysis-container"></div>
+
+    <!-- Audit Log view injected here -->
+    <div id="audit-log-container"></div>
+
+    <!-- Report Export View -->
+    <section id="report" class="view">
+      <div class="section-header scan-header mb-20">
+        <div>
+          <div class="section-title">Report Export</div>
+          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">Forensic PDF, CSV & JSON Export</div>
+        </div>
+      </div>
+
+      <!-- Progress Bar (hidden by default) -->
+      <div id="report-progress" style="display:none;margin-bottom:16px;">
+        <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;" id="report-progress-label">Generating…</div>
+        <div class="progress-bar-container" style="height:6px;">
+          <div class="progress-bar" id="report-progress-bar" style="width:0%;transition:width 0.4s ease;"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;">
+        <!-- Left: Options -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+          <!-- Evidence Types -->
+          <div class="glassmorphism" style="padding:20px;" id="report-section">
+            <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Evidence Types</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="type-system-logs" checked>
+                <span class="checkmark"></span>
+                <span style="color:#64b5f6;">■</span> System Logs
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="type-browser-history" checked>
+                <span class="checkmark"></span>
+                <span style="color:#69f0ae;">■</span> Browser History
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="type-network-connections" checked>
+                <span class="checkmark"></span>
+                <span style="color:#ffd740;">■</span> Network Connections
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="type-file-metadata" checked>
+                <span class="checkmark"></span>
+                <span style="color:#ce93d8;">■</span> File Metadata
+              </label>
+            </div>
+          </div>
+
+          <!-- Report Sections -->
+          <div class="glassmorphism" style="padding:20px;">
+            <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Report Sections</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label class="checkbox-label"><input type="checkbox" id="section-summary" checked><span class="checkmark"></span>Executive Summary</label>
+              <label class="checkbox-label"><input type="checkbox" id="section-chain" checked><span class="checkmark"></span>Chain of Custody</label>
+              <label class="checkbox-label"><input type="checkbox" id="section-evidence" checked><span class="checkmark"></span>Evidence Records</label>
+              <label class="checkbox-label"><input type="checkbox" id="section-integrity" checked><span class="checkmark"></span>Integrity Verification</label>
+              <label class="checkbox-label"><input type="checkbox" id="section-metadata"><span class="checkmark"></span>Raw Metadata</label>
+            </div>
+          </div>
+
+          <!-- Case Info -->
+          <div class="glassmorphism" style="padding:20px;">
+            <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Case Information</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div>
+                <label style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:5px;">Case Name</label>
+                <input type="text" id="report-case-name" placeholder="Case-2024-001">
+              </div>
+              <div>
+                <label style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:5px;">Analyst</label>
+                <input type="text" id="report-analyst" placeholder="Your name">
+              </div>
+            </div>
+          </div>
+
+          <!-- Format -->
+          <div class="glassmorphism" style="padding:20px;">
+            <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Output Format</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.8rem;color:var(--text-secondary);">
+                <input type="radio" name="report-format" value="pdf" checked style="accent-color:var(--cyan-bright);width:auto;">
+                <span style="color:var(--danger);">●</span> PDF — Forensic Report
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.8rem;color:var(--text-secondary);">
+                <input type="radio" name="report-format" value="json" style="accent-color:var(--cyan-bright);width:auto;">
+                <span style="color:var(--cyan-bright);">●</span> JSON — Structured Data
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.8rem;color:var(--text-secondary);">
+                <input type="radio" name="report-format" value="csv" style="accent-color:var(--cyan-bright);width:auto;">
+                <span style="color:var(--success);">●</span> CSV — Spreadsheet
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.8rem;color:var(--text-secondary);">
+                <input type="radio" name="report-format" value="html" style="accent-color:var(--cyan-bright);width:auto;">
+                <span style="color:var(--warning);">●</span> HTML — Web Report
+              </label>
+            </div>
+          </div>
+
+          <!-- Generate Buttons -->
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary btn-large w-full" id="generate-report-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              ⬇ Generate Report
             </button>
-            <div id="profile-panel" class="profile-panel hidden" role="dialog" aria-label="User profile">
-                <div class="profile-panel-header">
-                    <span>Profile</span>
-                    <button class="profile-close-btn" id="profile-close-btn" type="button" aria-label="Close profile panel">×</button>
-                </div>
-                <div class="profile-panel-body">
-                    <div class="profile-row">
-                        <span class="profile-label">Role</span>
-                        <span class="profile-value" id="profile-role">Loading...</span>
-                    </div>
-                    <div class="profile-row">
-                        <span class="profile-label">Permissions</span>
-                        <span class="profile-value" id="profile-permissions">Loading...</span>
-                    </div>
-                    <div class="profile-row">
-                        <span class="profile-label">License</span>
-                        <span class="profile-value" id="profile-license">Loading...</span>
-                    </div>
-                    <div class="profile-row">
-                        <span class="profile-label">Evidence Items</span>
-                        <span class="profile-value" id="profile-evidence-count">Loading...</span>
-                    </div>
-                    <div class="profile-row">
-                        <span class="profile-label">Retention</span>
-                        <span class="profile-value" id="profile-retention">Loading...</span>
-                    </div>
-                    <div class="profile-row">
-                        <span class="profile-label">Integrity</span>
-                        <span class="profile-value" id="profile-integrity">Loading...</span>
-                    </div>
-                </div>
-            </div>
+            <button class="btn btn-secondary w-full" id="preview-report-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Preview Report
+            </button>
+          </div>
         </div>
-            <div class="role-controls">
-                <select id="role-select" class="role-select">
-                    <option value="collector">Collector</option>
-                    <option value="reviewer">Reviewer</option>
-                    <option value="exporter">Exporter</option>
-                </select>
-                <button class="btn btn-secondary btn-icon-only" id="switch-role-btn" title="Switch Role">⟳</button>
+
+        <!-- Right: Preview + History -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <!-- Live Preview Panel -->
+          <div class="glassmorphism" style="padding:20px;">
+            <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Live Preview</div>
+            <div id="report-preview" style="min-height:320px;background:rgba(0,0,0,0.2);border-radius:8px;overflow:hidden;"></div>
+          </div>
+
+          <!-- Report History -->
+          <div class="glassmorphism" style="padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);">Report History</div>
+              <button class="btn btn-secondary" id="clear-history-btn" style="padding:4px 10px;font-size:0.65rem;">Clear</button>
             </div>
+            <div id="report-history-list"></div>
+          </div>
         </div>
-    </nav>
+      </div>
+    </section>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-        <!-- Dashboard View - Loaded from views/dashboard.html -->
-        <div id="dashboard-container"></div>
+  </main>
 
-        <!-- Timeline View - Loaded from views/timeline.html -->
-        <div id="timeline-container"></div>
+  <!-- Evidence Detail Panel (overlays main-content) -->
+  <div id="detail-panel-container"></div>
 
-        <!-- Detail View -->
-        <section id="detail" class="view">
-            <div class="detail-header">
-                <h1>Evidence Details</h1>
-                <div class="detail-actions">
-                    <button class="btn btn-secondary" id="refresh-detail">Refresh</button>
-                    <button class="btn btn-primary" id="export-evidence">Export</button>
-                </div>
-            </div>
-
-            <!-- Evidence Detail Panel - Loaded from components/evidence-detail-panel.html -->
-            <div id="detail-panel-container"></div>
-        </section>
-
-        <!-- Report Export View -->
-        <section id="report" class="view">
-            <div class="report-header">
-                <h1>Report Export</h1>
-            </div>
-
-            <div class="report-options glassmorphism">
-                <h3>Export Options</h3>
-                <div class="option-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="include-system-logs" checked>
-                        <span class="checkmark"></span>
-                        Include System Logs
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="include-browser-history" checked>
-                        Include Browser History
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="include-network-data" checked>
-                        Include Network Data
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="include-file-metadata" checked>
-                        Include File Metadata
-                    </label>
-                </div>
-
-                <div class="format-selection">
-                    <label>Export Format:</label>
-                    <select id="export-format">
-                        <option value="pdf">PDF Report</option>
-                        <option value="zip">ZIP Archive</option>
-                        <option value="csv">CSV Data</option>
-                    </select>
-                </div>
-
-                <button class="btn btn-primary btn-large" id="generate-report">
-                    Generate Report
-                </button>
-            </div>
-
-            <div class="report-preview glassmorphism">
-                <h3>Report Preview</h3>
-                <div id="preview-content">
-                    <p>Select evidence types and format to see preview</p>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="loading-spinner">
-            <div class="spinner"></div>
-            <p>Processing Evidence...</p>
-        </div>
+  <!-- ── Loading Overlay ─────────────────────────────────────── -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <p>Processing Evidence…</p>
     </div>
+  </div>
 
-    <script src="js/main.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/timeline.js"></script>
-    <script src="js/detail-view.js"></script>
-    <script src="js/report-export.js"></script>
-    <script src="js/profile.js"></script>
-    <script src="js/bootstrap.js"></script>
-    <script src="js/role-manager.js"></script>
+  <!-- ── Scripts (order matters) ──────────────────────────────── -->
+  <script src="js/main.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/timeline.js"></script>
+  <script src="js/detail-view.js"></script>
+  <script src="js/threat-analysis.js"></script>
+  <script src="js/audit-log.js"></script>
+  <script src="js/report-export.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/role-manager.js"></script>
+  <script src="js/bootstrap.js"></script>
 </body>
-
 </html>

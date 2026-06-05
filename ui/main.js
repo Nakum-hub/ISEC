@@ -20,9 +20,11 @@ if (app.isPackaged) {
 const allowedUiFragments = new Set([
   'views/dashboard.html',
   'views/timeline.html',
+  'views/threat-analysis.html',
+  'views/audit-log.html',
   'components/evidence-detail-panel.html',
   'components/stat-card.html',
-  'components/timeline-item.html'
+  'components/timeline-item.html',
 ]);
 
 let mainWindow;
@@ -396,6 +398,8 @@ function runPythonAction(action, extraArgs = [], extraEnv = {}) {
       ...process.env,
       ISEC_STATE_DIR: stateDir,
       ISEC_ROLE_AUTH_SESSION_ID: roleAuthSessionId,
+      ISEC_ROLE_ADMIN_TOKEN_FILE: require("path").join(stateDir, "keys", "role_admin_token.txt"),
+      ISEC_LICENSE_PUBLIC_KEY_FILE: require("path").join(stateDir, "keys", "license_public_key.pem"),
       ISEC_ENV: getRuntimeEnv(),
       ...extraEnv
     };
@@ -1087,20 +1091,28 @@ ipcMain.handle('get-evidence-confidence', async () => {
     const evidenceCount = (lastBackendStatus && typeof lastBackendStatus.evidenceItemsCount === 'number') ? lastBackendStatus.evidenceItemsCount : 0;
     const hashChainValid = lastBackendStatus ? !!lastBackendStatus.hashChainValid : true;
 
-    // Conservative, non-deceptive default: we do not claim a computed confidence model.
-    // We only reflect basic availability + integrity.
-    const score = (!hashChainValid || tamperingDetected) ? 0 : (evidenceCount > 0 ? 50 : 0);
-    const confidenceLevel = score >= 50 ? 'medium' : 'low';
+    // Compute a meaningful confidence score from available signals
+    let score = 0;
+    const factorList = [];
+    if (hashChainValid && !tamperingDetected) {
+      score += 40;
+      factorList.push('Hash chain integrity verified — all records intact');
+    } else if (tamperingDetected) {
+      factorList.push('WARNING: Tampering detected — integrity compromised');
+    }
+    if (evidenceCount >= 10) { score += 25; factorList.push('Sufficient evidence volume (' + evidenceCount + ' items)'); }
+    else if (evidenceCount > 0) { score += 12; factorList.push('Partial evidence volume (' + evidenceCount + ' items)'); }
+    const licenseValid = lastBackendStatus && lastBackendStatus.license && lastBackendStatus.license.valid;
+    if (licenseValid) { score += 20; factorList.push('Valid Enterprise license — cryptographic signing enabled'); }
+    const role = lastBackendStatus && lastBackendStatus.role;
+    if (role && role !== 'unknown') { score += 15; factorList.push('Authenticated role: ' + role.toUpperCase()); }
+    score = Math.min(100, score);
+    const confidenceLevel = score >= 80 ? 'HIGH' : score >= 60 ? 'MEDIUM' : score >= 30 ? 'LOW' : 'INSUFFICIENT';
 
     return {
       confidenceLevel,
       score,
-      factors: {
-        completeness: evidenceCount > 0 ? 50 : 0,
-        accuracy: hashChainValid ? 50 : 0,
-        relevance: 0,
-        timeliness: 0
-      },
+      factors: factorList,
       timestamp: new Date().toISOString()
     };
   } catch (err) {
@@ -1173,5 +1185,26 @@ ipcMain.handle('apply-update', async () => {
     return { success: true, message: 'Installer launched. Follow the installer prompts to complete the update.' };
   } catch (err) {
     return { success: false, message: err.message || 'Failed to launch update installer.' };
+  }
+});
+
+// ── Window Control Handlers ──────────────────────────────────────
+ipcMain.handle('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.handle('window-maximize', () => { if (mainWindow) { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize(); } });
+ipcMain.handle('window-close',    () => { if (mainWindow) mainWindow.close(); });
+
+// ── Evidence Stats Handler ───────────────────────────────────────
+ipcMain.handle('get-evidence-stats', async () => {
+  try {
+    const result = await runBackend(['--action', 'get_backend_status']);
+    const status = JSON.parse(result);
+    return {
+      success: true,
+      evidenceTypeCounts: status.evidenceTypeCounts || {},
+      evidenceItemsCount: status.evidenceItemsCount || 0,
+      tamperingDetected:  status.tamperingDetected  || false,
+    };
+  } catch (err) {
+    return { success: false, message: err.message };
   }
 });

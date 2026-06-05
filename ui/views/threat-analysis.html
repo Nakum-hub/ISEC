@@ -1,0 +1,80 @@
+<section id="threat-analysis" class="view">
+  <div class="section-header scan-header mb-20">
+    <div>
+      <div class="section-title">Threat Analysis</div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">Automated Risk Intelligence & Anomaly Detection</div>
+    </div>
+    <div class="section-actions">
+      <button class="btn btn-primary" id="threat-refresh-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Re-Analyse
+      </button>
+    </div>
+  </div>
+
+  <!-- Risk Score Banner -->
+  <div id="risk-banner" class="glassmorphism" style="padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:24px;">
+    <div style="text-align:center;flex-shrink:0;">
+      <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:6px;">Overall Risk</div>
+      <div id="risk-score-label" style="font-family:var(--font-mono);font-size:3rem;font-weight:800;line-height:1;color:var(--success);">0</div>
+      <div id="risk-level-label" style="font-family:var(--font-mono);font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--success);margin-top:4px;">MINIMAL</div>
+    </div>
+    <div style="flex:1;">
+      <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin-bottom:10px;">
+        <div id="risk-bar" style="height:100%;border-radius:4px;width:0%;transition:width 1s ease;background:var(--success);box-shadow:0 0 10px var(--success);"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        <div><div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Anomalies</div><div id="risk-anomalies" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:var(--text-primary);">—</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Critical</div><div id="risk-critical" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:var(--danger);">—</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Chain Status</div><div id="risk-chain" style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;color:var(--success);">—</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Analysed</div><div id="risk-analysed" style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;color:var(--text-secondary);">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <!-- Anomaly Feed -->
+    <div class="glassmorphism" style="padding:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);">Anomaly Detection</div>
+        <select id="anomaly-filter-sev" style="width:110px;font-size:0.68rem;padding:4px 8px;">
+          <option value="all">All Severity</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+        </select>
+      </div>
+      <div id="anomaly-list" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Pattern Analysis -->
+    <div class="glassmorphism" style="padding:20px;">
+      <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Pattern Analysis</div>
+      <div id="pattern-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Severity Distribution + Top IPs -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <!-- Severity distribution bar chart -->
+    <div class="glassmorphism" style="padding:20px;">
+      <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Severity Distribution</div>
+      <div style="position:relative;height:150px;">
+        <canvas id="threat-bar-chart" style="width:100%;height:100%;"></canvas>
+      </div>
+    </div>
+
+    <!-- Network Activity -->
+    <div class="glassmorphism" style="padding:20px;">
+      <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Notable Network Activity</div>
+      <div id="network-activity-list" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="glassmorphism" style="padding:20px;">
+    <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Security Recommendations</div>
+    <div id="recommendations-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+  </div>
+</section>

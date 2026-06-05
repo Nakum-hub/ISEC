@@ -661,3 +661,64 @@ Traceback (most recent call last):
   File "C:\app\ISEC\main.py", line 221, in emit_json
     out.flush()
 OSError: [Errno 22] Invalid argument
+2026-06-04 11:27:58,940 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+2026-06-04 11:28:01,556 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+2026-06-04 11:28:30,420 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+2026-06-04 11:28:35,727 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+2026-06-04 11:28:35,860 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+2026-06-04 11:28:47,285 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Error loading role: 
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-04 11:29:09,830 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-04 11:29:14,358 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-04 11:29:19,403 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 01:37:08,503 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 01:37:13,282 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.

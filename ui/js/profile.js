@@ -1,123 +1,51 @@
-// Profile panel behavior
-function getIsecBridge() {
-  if (typeof window === 'undefined' || !window.isec || typeof window.isec.invoke !== 'function') {
-    return null;
-  }
-  return window.isec;
-}
+// ISEC Profile Module — role display and profile panel population
+// Profile panel init is now handled by bootstrap.js
+// This file ensures legacy compatibility with role-manager.js
 
-let profilePanelOpen = false;
+(function () {
+  'use strict';
 
-function setProfilePanelOpen(open) {
-  const panel = document.getElementById('profile-panel');
-  const btn = document.getElementById('profile-btn');
-  if (!panel || !btn) {
-    return;
-  }
+  // updateProfileDisplay is called by role-manager after role changes
+  async function updateProfileDisplay() {
+    const bridge = window.isec;
+    if (!bridge) return;
+    try {
+      const [status, retention, integrity] = await Promise.all([
+        bridge.invoke('get-backend-status').catch(() => null),
+        bridge.invoke('get-retention-status').catch(() => null),
+        bridge.invoke('get-system-integrity').catch(() => null),
+      ]);
 
-  profilePanelOpen = open;
-  if (open) {
-    panel.classList.remove('hidden');
-    panel.classList.add('open');
-    btn.setAttribute('aria-expanded', 'true');
-    refreshProfilePanel().catch(() => {});
-  } else {
-    panel.classList.add('hidden');
-    panel.classList.remove('open');
-    btn.setAttribute('aria-expanded', 'false');
-  }
-}
+      const role = (status && status.role) || 'unknown';
+      const perms = (status && Array.isArray(status.permissions)) ? status.permissions.join(', ') : '—';
+      const lic = (status && status.license) ? (status.license.valid ? (status.license.plan || 'Licensed') : 'Invalid') : '—';
+      const evCount = (status && typeof status.evidenceItemsCount === 'number') ? status.evidenceItemsCount : 0;
+      const ret = retention ? `${retention.retention_days || '—'}d | ${retention.active_evidence || 0} active` : '—';
+      const intOk = !(integrity && integrity.status === 'compromised') && !(status && status.tamperingDetected);
 
-function handleProfileOutsideClick(event) {
-  if (!profilePanelOpen) {
-    return;
-  }
-  const panel = document.getElementById('profile-panel');
-  const btn = document.getElementById('profile-btn');
-  if (!panel || !btn) {
-    return;
-  }
-  if (panel.contains(event.target) || btn.contains(event.target)) {
-    return;
-  }
-  setProfilePanelOpen(false);
-}
+      const set = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+      set('profile-role',           role.toUpperCase());
+      set('profile-permissions',     perms);
+      set('profile-license',         lic);
+      set('profile-evidence-count',  evCount.toLocaleString());
+      set('profile-retention',       ret);
+      set('profile-integrity',       intOk ? '✓ VERIFIED' : '⚠ COMPROMISED');
+      set('current-role-label',      role);
 
-async function refreshProfilePanel() {
-  const bridge = getIsecBridge();
-  if (!bridge) {
-    return;
-  }
+      const avatarEl = document.getElementById('user-avatar-icon');
+      if (avatarEl) {
+        const icons = { collector:'🔍', reviewer:'👁', exporter:'📤' };
+        avatarEl.textContent = icons[role] || '👤';
+      }
 
-  const status = await bridge.invoke('get-backend-status');
+      // Sync role selector
+      const roleSelect = document.getElementById('role-select');
+      if (roleSelect && role !== 'unknown') roleSelect.value = role;
 
-  const roleEl = document.getElementById('profile-role');
-  const permsEl = document.getElementById('profile-permissions');
-  const licenseEl = document.getElementById('profile-license');
-  const evidenceEl = document.getElementById('profile-evidence-count');
-  const retentionEl = document.getElementById('profile-retention');
-  const integrityEl = document.getElementById('profile-integrity');
-
-  if (roleEl) {
-    const roleName = status && status.roleName ? status.roleName : (status && status.role ? status.role : 'unknown');
-    roleEl.textContent = roleName;
-  }
-
-  if (permsEl) {
-    const perms = status && Array.isArray(status.permissions) ? status.permissions : [];
-    permsEl.textContent = perms.length ? perms.join(', ') : 'none';
-  }
-
-  if (licenseEl) {
-    if (!status || !status.license) {
-      licenseEl.textContent = 'unknown';
-    } else if (status.license.valid) {
-      const plan = status.license.plan ? ` (${status.license.plan})` : '';
-      licenseEl.textContent = `licensed${plan}`;
-    } else {
-      licenseEl.textContent = 'unlicensed';
+    } catch (err) {
+      console.error('Profile update error:', err);
     }
   }
 
-  if (evidenceEl) {
-    const count = status && typeof status.evidenceItemsCount === 'number' ? status.evidenceItemsCount : 0;
-    evidenceEl.textContent = String(count);
-  }
-
-  if (retentionEl) {
-    const retention = status && status.retention ? status.retention : null;
-    if (retention && retention.policy) {
-      const days = retention.retention_days != null ? `${retention.retention_days} days` : 'permanent';
-      retentionEl.textContent = `${retention.policy} (${days})`;
-    } else {
-      retentionEl.textContent = 'unknown';
-    }
-  }
-
-  if (integrityEl) {
-    const compromised = status && (status.tamperingDetected || status.hashChainValid === false);
-    integrityEl.textContent = compromised ? 'compromised' : 'valid';
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('profile-btn');
-  const closeBtn = document.getElementById('profile-close-btn');
-
-  if (btn) {
-    btn.addEventListener('click', () => {
-      setProfilePanelOpen(!profilePanelOpen);
-    });
-  }
-
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => setProfilePanelOpen(false));
-  }
-
-  document.addEventListener('click', handleProfileOutsideClick);
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && profilePanelOpen) {
-      setProfilePanelOpen(false);
-    }
-  });
-});
+  window.updateProfileDisplay = updateProfileDisplay;
+})();

@@ -1,119 +1,178 @@
 <section id="dashboard" class="view active">
-    <div class="dashboard-header">
-        <h1>Security Dashboard</h1>
-        <div class="actions">
-            <button class="btn btn-primary" id="collect-btn">
-                <span class="btn-icon">🔍</span>
-                Collect Evidence
-            </button>
+  <!-- Header Row -->
+  <div class="section-header scan-header mb-20">
+    <div>
+      <div class="section-title">Security Dashboard</div>
+      <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); margin-top: 4px; letter-spacing: 0.12em; text-transform: uppercase;">
+        Evidence Collection Command Center
+      </div>
+    </div>
+    <div class="section-actions">
+      <button class="btn btn-secondary btn-icon-only" id="dashboard-refresh-btn" title="Refresh Stats" style="font-size:16px;">⟳</button>
+      <button class="btn btn-primary" id="collect-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Collect Evidence
+      </button>
+    </div>
+  </div>
+
+  <!-- Stat Cards Row -->
+  <div class="stats-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px;">
+    <!-- Total Evidence -->
+    <div class="glassmorphism" style="padding: 16px; position: relative; overflow: hidden;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px;">Evidence</div>
+      <div style="font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700; color: var(--cyan-bright); line-height: 1;" id="total-evidence">0</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Total Items</div>
+      <canvas id="sparkline-evidence" style="position: absolute; bottom: 0; right: 0; width: 80px; height: 36px; opacity: 0.5;"></canvas>
+    </div>
+    <!-- Integrity -->
+    <div class="glassmorphism" id="integrity-card" style="padding: 16px; position: relative; overflow: hidden; border-color: rgba(0,230,118,0.2);">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px;">Integrity</div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="integrity-indicator integrity-valid" id="integrity-status-card">
+          <div class="integrity-dot"></div>
+          <span id="integrity-status" style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700;">VALID</span>
         </div>
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Chain of Custody</div>
+    </div>
+    <!-- License -->
+    <div class="glassmorphism" style="padding: 16px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px;">License</div>
+      <div style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 700; color: var(--text-primary);" id="license-status">Unknown</div>
+      <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;" id="license-plan">Loading...</div>
+    </div>
+    <!-- Last Collection -->
+    <div class="glassmorphism" style="padding: 16px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px;">Last Scan</div>
+      <div style="font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);" id="last-collect">Never</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Collection Time</div>
+    </div>
+    <!-- Reports -->
+    <div class="glassmorphism" style="padding: 16px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 8px;">Reports</div>
+      <div style="font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700; color: var(--purple);" id="reports-count">0</div>
+      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Generated</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 20px;">
+    <!-- Evidence Distribution Donut -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 16px;">Evidence Distribution</div>
+      <div style="position: relative; height: 160px; margin-bottom: 16px;">
+        <canvas id="donut-chart" style="width: 100%; height: 100%;"></canvas>
+      </div>
+      <div id="donut-legend" style="display: flex; flex-direction: column; gap: 6px;"></div>
     </div>
 
-    <div class="stats-grid">
-        <div class="dashboard-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-info">
-                <h3 id="total-evidence">0</h3>
-                <p>Total Evidence</p>
-            </div>
+    <!-- Collection Activity Line Chart -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted);">Collection Activity</div>
+        <div id="chart-timeframe" style="display: flex; gap: 6px;">
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.65rem;" data-range="7" onclick="setChartRange(7, this)">7D</button>
+          <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.65rem;" data-range="30" onclick="setChartRange(30, this)">30D</button>
         </div>
-        <div class="dashboard-card">
-            <div class="stat-icon">🔒</div>
-            <div class="stat-info">
-                <h3 id="integrity-status">Verified</h3>
-                <p>Integrity Status</p>
-            </div>
-        </div>
+      </div>
+      <div style="position: relative; height: 160px;">
+        <canvas id="line-chart" style="width: 100%; height: 100%;"></canvas>
+      </div>
+    </div>
+  </div>
 
-        <div class="dashboard-card">
-            <div class="stat-icon">KEY</div>
-            <div class="stat-info">
-                <h3 id="license-status">Unlicensed</h3>
-                <p id="license-plan">License Status</p>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <div class="stat-icon">⏱️</div>
-            <div class="stat-info">
-                <h3 id="last-collect">Never</h3>
-                <p>Last Collection</p>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <div class="stat-icon">📋</div>
-            <div class="stat-info">
-                <h3 id="reports-count">0</h3>
-                <p>Reports Generated</p>
-            </div>
-        </div>
+  <!-- Bottom Row: Evidence Types + Threat Level + Quick Actions -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+    <!-- Evidence Type Breakdown -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 14px;">Evidence Types</div>
+      <div id="evidence-type-bars" style="display: flex; flex-direction: column; gap: 10px;"></div>
     </div>
 
-    <div class="quick-actions glassmorphism license-panel">
-        <h3>License Details</h3>
-        <div class="license-grid">
-            <div class="license-item">
-                <p class="license-label">License ID</p>
-                <p class="license-value" id="license-id">Unknown</p>
-            </div>
-            <div class="license-item">
-                <p class="license-label">Customer</p>
-                <p class="license-value" id="license-customer">Unknown</p>
-            </div>
-            <div class="license-item">
-                <p class="license-label">Plan</p>
-                <p class="license-value" id="license-plan-detail">Unknown</p>
-            </div>
-            <div class="license-item">
-                <p class="license-label">Expiration</p>
-                <p class="license-value" id="license-expiration">Unknown</p>
-            </div>
-            <div class="license-item">
-                <p class="license-label">Features Enabled</p>
-                <p class="license-value" id="license-features">None</p>
-            </div>
-            <div class="license-item">
-                <p class="license-label">Machine Fingerprint Binding</p>
-                <p class="license-value" id="license-fingerprint">Unknown</p>
-            </div>
-        </div>
+    <!-- System Health / Threat Level -->
+    <div class="glassmorphism" style="padding: 20px; text-align: center;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 10px;">Confidence Score</div>
+      <div style="position: relative; height: 150px;">
+        <canvas id="gauge-chart" style="width: 100%; height: 100%;"></canvas>
+      </div>
+      <div id="health-status-row" style="display: flex; justify-content: center; gap: 16px; margin-top: 6px;"></div>
     </div>
 
-    <div class="quick-actions glassmorphism">
-        <h3>Quick Actions</h3>
-        <div class="actions-grid">
-            <button class="action-btn" data-action="system-logs">
-                <span class="action-icon">🖥️</span>
-                <span>System Logs</span>
-            </button>
-            <button class="action-btn" data-action="browser-history">
-                <span class="action-icon">🌐</span>
-                <span>Browser History</span>
-            </button>
-            <button class="action-btn" data-action="network-connections">
-                <span class="action-icon">🔗</span>
-                <span>Network Connections</span>
-            </button>
-            <button class="action-btn" data-action="file-metadata">
-                <span class="action-icon">📁</span>
-                <span>File Metadata</span>
-            </button>
+    <!-- Quick Actions -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 14px;">Quick Collect</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <button class="action-btn quick-collect-btn" data-action="system-logs"
+          style="background: rgba(100,181,246,0.07); border: 1px solid rgba(100,181,246,0.2); border-radius: 8px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #64b5f6;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">Sys Logs</span>
+        </button>
+        <button class="action-btn quick-collect-btn" data-action="browser-history"
+          style="background: rgba(105,240,174,0.07); border: 1px solid rgba(105,240,174,0.2); border-radius: 8px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #69f0ae;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">Browser</span>
+        </button>
+        <button class="action-btn quick-collect-btn" data-action="network-connections"
+          style="background: rgba(255,215,64,0.07); border: 1px solid rgba(255,215,64,0.2); border-radius: 8px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #ffd740;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+          <span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">Network</span>
+        </button>
+        <button class="action-btn quick-collect-btn" data-action="file-metadata"
+          style="background: rgba(206,147,216,0.07); border: 1px solid rgba(206,147,216,0.2); border-radius: 8px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #ce93d8;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">Files</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- License + Updates Row -->
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+    <!-- License Details -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 14px;">License Details</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">License ID</div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary);" id="license-id">—</div>
         </div>
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Customer</div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary);" id="license-customer">—</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Plan</div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--cyan-bright);" id="license-plan-detail">—</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Expires</div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary);" id="license-expiration">—</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Features</div>
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary);" id="license-features">—</div>
+        </div>
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Fingerprint</div>
+          <div style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="license-fingerprint">—</div>
+        </div>
+      </div>
     </div>
 
-    <div class="quick-actions glassmorphism">
-        <h3>Offline Updates</h3>
-        <p id="update-status">No update checks yet.</p>
-        <div class="actions-grid">
-            <button class="action-btn" id="check-updates-btn">
-                <span class="action-icon">CHK</span>
-                <span>Check Updates</span>
-            </button>
-            <button class="action-btn" id="apply-update-btn" disabled>
-                <span class="action-icon">APPLY</span>
-                <span>Apply Update</span>
-            </button>
-        </div>
+    <!-- Offline Updates -->
+    <div class="glassmorphism" style="padding: 20px;">
+      <div style="font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 14px;">Offline Updates</div>
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;" id="update-status">No update checks performed.</div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-secondary" style="flex: 1;" id="check-updates-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Check
+        </button>
+        <button class="btn btn-success" style="flex: 1;" id="apply-update-btn" disabled>
+          Apply
+        </button>
+      </div>
     </div>
-
-
+  </div>
 </section>

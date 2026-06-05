@@ -1,0 +1,22 @@
+{
+  "payload": {
+    "license_id": "ISEC-ENT-2024-FULL",
+    "customer": "ISEC Enterprise Demo",
+    "plan": "Enterprise",
+    "features": [
+      "view",
+      "collect",
+      "export",
+      "report",
+      "admin",
+      "advanced_analytics",
+      "threat_intel",
+      "assign_role",
+      "set_retention"
+    ],
+    "issued_at": "2026-06-04T11:28:43.281896+00:00",
+    "expires_at": "2027-06-04T11:28:43.281911+00:00",
+    "system_fingerprint": "253f358f8dd46ef3f41ca027f55a6ba15863997517c9842507056836073fb1ca"
+  },
+  "signature": "a661739825b652595255b7b9907f300d3d2bbf8324b21515b256036d5b30333375e60f30425ebbd045df6b653ebe5cb0ed6ff6f9f6b49297ed0303394933da08"
+}

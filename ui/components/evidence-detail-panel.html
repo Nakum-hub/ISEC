@@ -1,35 +1,143 @@
-<div class="detail-content glassmorphism">
-    <div class="detail-tabs">
-        <button class="tab-btn active" data-tab="overview">Overview</button>
-        <button class="tab-btn" data-tab="metadata">Metadata</button>
-        <button class="tab-btn" data-tab="chain">Chain of Custody</button>
-        <button class="tab-btn" data-tab="hash">Hash Verification</button>
+<!-- Evidence Detail Panel — Full Chain of Custody & Integrity Viewer -->
+<div id="detail-panel" class="hidden" style="position:fixed;inset:0 0 0 220px;top:38px;background:rgba(2,6,9,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:500;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border-dim);">
+
+  <!-- Panel Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border-dim);flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button id="detail-back-btn" class="btn btn-secondary" style="padding:6px 12px;font-size:0.75rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back
+      </button>
+      <div>
+        <div style="font-family:var(--font-display);font-size:0.9rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--cyan-bright);">Evidence Detail</div>
+        <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);margin-top:2px;" id="detail-subtitle">Loading…</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div id="detail-integrity-badge" class="integrity-indicator integrity-valid">
+        <div class="integrity-dot"></div>
+        <span style="font-size:0.72rem;">VERIFIED</span>
+      </div>
+      <button class="btn btn-secondary" id="detail-copy-btn" style="padding:6px 12px;font-size:0.75rem;">Copy JSON</button>
+      <button class="btn btn-primary" id="detail-export-btn" style="padding:6px 12px;font-size:0.75rem;">Export</button>
+    </div>
+  </div>
+
+  <!-- Panel Body -->
+  <div style="flex:1;overflow-y:auto;padding:24px;display:grid;grid-template-columns:1fr 360px;gap:20px;">
+
+    <!-- Left Column -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- Description & Classification -->
+      <div class="glassmorphism" style="padding:20px;">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:12px;">Evidence Record</div>
+        <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:12px;" id="detail-description">—</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Type</div>
+            <div id="detail-type" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--cyan-bright);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Severity</div>
+            <div id="detail-severity-badge">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Collected</div>
+            <div id="detail-timestamp" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Actor</div>
+            <div id="detail-actor" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Workstation</div>
+            <div id="detail-workstation" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">IP Address</div>
+            <div id="detail-ip" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Size</div>
+            <div id="detail-size" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Retention</div>
+            <div id="detail-retention" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-secondary);">—</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.58rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Record ID</div>
+            <div id="detail-id" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Raw Evidence Data -->
+      <div class="glassmorphism" style="padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);">Raw Evidence Data</div>
+          <button class="btn btn-secondary" id="toggle-raw-btn" style="padding:4px 10px;font-size:0.65rem;">Show Raw</button>
+        </div>
+        <div id="evidence-data-formatted" style="display:block;"></div>
+        <pre id="evidence-data-raw" style="display:none;font-family:var(--font-mono);font-size:0.7rem;color:var(--teal);white-space:pre-wrap;word-break:break-all;background:rgba(0,200,255,0.03);border:1px solid var(--border-dim);border-radius:6px;padding:12px;max-height:300px;overflow-y:auto;"></pre>
+      </div>
+
+      <!-- Additional Fields -->
+      <div class="glassmorphism" id="additional-fields-card" style="padding:20px;display:none;">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:12px;">Additional Fields</div>
+        <div id="additional-fields-content" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
+      </div>
     </div>
 
-    <div class="tab-content">
-        <div id="overview-content" class="tab-pane active">
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <label>ID</label>
-                    <span id="evidence-id">#001</span>
-                </div>
-                <div class="detail-item">
-                    <label>Type</label>
-                    <span id="evidence-type">System Log</span>
-                </div>
-                <div class="detail-item">
-                    <label>Timestamp</label>
-                    <span id="evidence-timestamp">2024-01-27 09:00:00</span>
-                </div>
-                <div class="detail-item">
-                    <label>Size</label>
-                    <span id="evidence-size">2.4 MB</span>
-                </div>
-                <div class="detail-item">
-                    <label>SHA-256</label>
-                    <code id="evidence-hash">a1b2c3d4e5f6...</code>
-                </div>
-            </div>
+    <!-- Right Column: Chain of Custody + Integrity -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- Chain of Custody Visual -->
+      <div class="glassmorphism" style="padding:20px;">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:16px;">Chain of Custody</div>
+        <div id="custody-chain" style="display:flex;flex-direction:column;gap:0;">
+          <!-- Steps injected by JS -->
         </div>
+      </div>
+
+      <!-- Cryptographic Integrity -->
+      <div class="glassmorphism" style="padding:20px;">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Cryptographic Integrity</div>
+
+        <div style="margin-bottom:12px;">
+          <div style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">HMAC Signature</div>
+          <div id="detail-hmac" class="hash-display">—</div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Current Record Hash</div>
+          <div id="detail-hash-current" class="hash-display">—</div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Previous Record Hash</div>
+          <div id="detail-hash-prev" class="hash-display">—</div>
+        </div>
+
+        <!-- Verification Result -->
+        <div id="detail-verify-result" style="border-radius:8px;padding:12px;background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.2);display:flex;align-items:center;gap:10px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);animation:pulse-success 2s ease-in-out infinite;flex-shrink:0;"></div>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:0.7rem;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.08em;" id="verify-title">CHAIN INTACT</div>
+            <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-top:2px;" id="verify-detail">All cryptographic checks passed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confidence Analysis -->
+      <div class="glassmorphism" style="padding:20px;" id="confidence-card">
+        <div style="font-family:var(--font-mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:14px;">Evidence Quality</div>
+        <div id="confidence-content">
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);">Loading confidence data…</div>
+        </div>
+      </div>
+
     </div>
+  </div>
 </div>

@@ -19,3 +19,10 @@ keys/license_private_key.pem
 
 ui/node_modules/
 ui/dist/
+
+# ISEC v2 additions
+keys/license_private_key.pem
+/root/.config/
+*.sig.json
+.DS_Store
+Thumbs.db

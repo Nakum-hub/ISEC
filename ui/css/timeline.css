@@ -1,171 +1,192 @@
-/*
-Premium Security Timeline Styles
-Styles for the evidence timeline with smooth animations and modern glassmorphism
-*/
+/* ISEC Timeline Styles */
 
-.timeline-section {
-  margin-bottom: 2rem;
+/* ── Filter Pills ─────────────────────────────────────────── */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-dim);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  white-space: nowrap;
 }
 
-.timeline-items {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.filter-pill:hover {
+  border-color: var(--pill-color, var(--border-bright));
+  color: var(--pill-color, var(--cyan-bright));
+  background: rgba(0,200,255,0.05);
+}
+
+.filter-pill.active {
+  border-color: var(--pill-color, var(--cyan-bright));
+  color: var(--pill-color, var(--cyan-bright));
+  background: color-mix(in srgb, var(--pill-color, var(--cyan-bright)) 10%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--pill-color, var(--cyan-bright)) 25%, transparent);
+}
+
+/* ── Timeline Item Card ──────────────────────────────────── */
+.timeline-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
   position: relative;
+  overflow: hidden;
+  animation: fadeInUp 0.3s ease forwards;
 }
 
-/* Vertical Line */
-.timeline-items::before {
+.timeline-item::before {
   content: '';
   position: absolute;
-  left: 39px;
-  /* Aligned with marker center */
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--glass-border);
-  z-index: 0;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--item-accent, var(--cyan-bright));
+  border-radius: 3px 0 0 3px;
+  box-shadow: 0 0 8px var(--item-accent, var(--cyan-bright));
 }
 
-.timeline-item {
-  position: relative;
-  background: var(--card-bg);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  padding: 1.25rem;
-  padding-left: 80px;
-  /* Space for marker */
-  margin-bottom: 1rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
-  transform: translateX(-20px);
-  animation: slideInRight 0.5s ease forwards;
-  min-height: 100px;
+.timeline-item:hover {
+  border-color: var(--item-accent, var(--border-bright));
+  background: rgba(10,20,38,0.9);
+  transform: translateX(2px);
+  box-shadow: -2px 0 16px rgba(0,200,255,0.08);
 }
 
-.timeline-item:nth-child(1) {
-  animation-delay: 0.1s;
+.timeline-item.expanded {
+  border-color: var(--item-accent, var(--cyan-bright));
+  box-shadow: 0 0 20px rgba(0,200,255,0.06);
 }
 
-.timeline-item:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.timeline-item:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.timeline-item:nth-child(4) {
-  animation-delay: 0.4s;
-}
-
-.timeline-item:nth-child(n+5) {
-  animation-delay: 0.5s;
-}
-
-@keyframes slideInRight {
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Timeline Marker (from components.css logic) */
-.timeline-marker {
-  position: absolute;
-  left: 32px;
-  top: 24px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--dark-bg);
-  border: 3px solid var(--primary-blue);
-  z-index: 2;
-  box-shadow: 0 0 10px rgba(0, 122, 204, 0.5);
-  transition: all 0.3s ease;
-}
-
-.timeline-item:hover .timeline-marker {
-  background: var(--primary-blue);
-  box-shadow: 0 0 15px rgba(0, 122, 204, 0.8);
-  transform: scale(1.2);
-}
-
-.timeline-content {
-  overflow: hidden;
-}
-
-.timeline-header {
+/* ── Item Header ─────────────────────────────────────────── */
+.item-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: 12px;
 }
 
-.evidence-type {
-  font-weight: 600;
-  color: var(--accent-blue);
-  text-transform: uppercase;
-  font-size: 0.875rem;
-  background: rgba(0, 170, 255, 0.1);
-  padding: 2px 8px;
-  border-radius: 4px;
+.item-type-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--item-accent, var(--cyan-bright)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--item-accent, var(--cyan-bright)) 25%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--item-accent, var(--cyan-bright));
 }
 
-.timestamp {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+.item-meta {
+  flex: 1;
+  min-width: 0;
 }
 
-.timeline-description {
+.item-description {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
 }
 
-.timeline-meta {
+.item-sub {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.item-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
   color: var(--text-muted);
-  font-size: 12px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 12px;
-  margin-top: 12px;
 }
 
-.timeline-actions {
+.item-id {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.item-badges {
   display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
-/* Evidence Type Colors */
-.type-system_logs {
-  color: #64b5f6;
-  border-color: #64b5f6;
+/* ── Expand Detail ───────────────────────────────────────── */
+.item-detail-expanded {
+  display: none;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-dim);
 }
 
-.type-browser_history {
-  color: #81c784;
-  border-color: #81c784;
+.timeline-item.expanded .item-detail-expanded {
+  display: block;
+  animation: fadeInUp 0.25s ease;
 }
 
-.type-network_connections {
-  color: #ffb74d;
-  border-color: #ffb74d;
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.type-file_metadata {
-  color: #ba68c8;
-  border-color: #ba68c8;
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .timeline-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
+.detail-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.detail-value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ── Pagination ──────────────────────────────────────────── */
+#timeline-pagination {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-bottom: 8px;
 }
