@@ -147,9 +147,10 @@
 
       if (result && result.success) {
         showProgress(100, 'Report generated!');
-        ISECNotify && ISECNotify.success(`Report exported: ${result.reportPath || 'report generated'}`);
+        const rPath = result.reportPath || result.filePath || 'report generated';
+        ISECNotify && ISECNotify.success(`Report exported: ${rPath}`);
 
-        addToHistory({ types, format, sections, caseName, analyst, path: result.reportPath, ts: new Date().toISOString(), count: items.length });
+        addToHistory({ types, format, sections, caseName, analyst, path: result.reportPath || result.filePath, ts: new Date().toISOString(), count: items.length });
       } else {
         ISECNotify && ISECNotify.error((result && result.message) || 'Report generation failed.');
       }

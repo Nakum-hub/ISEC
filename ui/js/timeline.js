@@ -366,5 +366,7 @@
   }
 
   window.copyItemToClipboard = copyItemToClipboard;
+  window.initTimeline        = initTimeline;
 
 })();
+

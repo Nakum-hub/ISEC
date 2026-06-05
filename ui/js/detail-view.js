@@ -33,12 +33,15 @@
     if (!bridge) { setSubtitle('Error: IPC bridge not available'); return; }
 
     try {
-      const [detail, confidence] = await Promise.all([
+      const [rawDetail, confidence] = await Promise.all([
         bridge.invoke('get-evidence-detail', { id }),
         bridge.invoke('get-evidence-confidence').catch(() => null),
       ]);
 
-      if (!detail || detail.error) {
+      // Handler returns { item: {...}, success } or a flat object
+      const detail = (rawDetail && rawDetail.item) ? rawDetail.item : rawDetail;
+
+      if (!detail || detail.error || rawDetail === null) {
         setSubtitle('Evidence not found or access denied.');
         return;
       }

@@ -843,7 +843,7 @@ ipcMain.handle('get-evidence-detail', async (event, options) => {
       return { success: false, item: null, message: 'Permission denied: View role required.' };
     }
 
-    const recordId = options && options.recordId ? String(options.recordId) : '';
+    const recordId = options && (options.recordId || options.id) ? String(options.recordId || options.id) : '';
     const extraArgs = [];
     if (recordId) {
       extraArgs.push('--record-id', recordId);
