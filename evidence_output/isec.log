@@ -736,3 +736,67 @@ Startup check - database_accessible: OK
 Hash chain verification passed - Evidence collection proceeding...
 Error loading consents: 
 Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 02:12:42,470 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 02:12:47,426 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 06:48:08,199 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-05 06:48:08,884 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-05 06:48:09,309 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-05 06:48:16,045 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 06:48:16,482 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.
+2026-06-05 06:48:16,908 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-05 06:48:23,618 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+2026-06-05 06:48:24,009 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 

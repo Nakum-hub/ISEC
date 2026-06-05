@@ -948,7 +948,22 @@ ipcMain.handle('set-user-role', async (event, payload) => {
     }
 
     const extraArgs = ['--role', roleValue];
-    const extraEnv = authToken ? { ISEC_ROLE_AUTH_TOKEN: authToken } : {};
+
+    // Electron auto-injects the admin token so the user never needs to type it.
+    // The token is stored locally by the IT admin at install time.
+    let resolvedToken = authToken; // honour explicit token if frontend supplies one
+    if (!resolvedToken) {
+      const tokenFilePath = path.join(getStateDir(), 'keys', 'role_admin_token.txt');
+      try {
+        if (fs.existsSync(tokenFilePath)) {
+          resolvedToken = fs.readFileSync(tokenFilePath, 'utf-8').trim();
+        }
+      } catch (e) {
+        console.warn('[set-user-role] Could not read admin token file:', e.message);
+      }
+    }
+
+    const extraEnv = resolvedToken ? { ISEC_ROLE_AUTH_TOKEN: resolvedToken } : {};
     const res = await runPythonAction('set_role', extraArgs, extraEnv);
     const json = res.json;
 

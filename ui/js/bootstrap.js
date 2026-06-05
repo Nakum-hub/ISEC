@@ -144,7 +144,10 @@
     // 6. Boot report export (pre-init so preview works immediately)
     if (typeof initReportExport === 'function') initReportExport();
 
-    // 7. Mark app ready
+    // 7. Sync role selector to current backend role
+    if (typeof syncRoleSelect === 'function') syncRoleSelect();
+
+    // 8. Mark app ready
     document.body.classList.add('app-ready');
     console.info('[ISEC] Bootstrap complete');
   }
