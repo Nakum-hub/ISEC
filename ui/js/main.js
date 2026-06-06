@@ -1,55 +1,54 @@
-// Main application initialization
+/**
+ * ISEC Renderer — Core Utilities
+ * Provides global helpers; window controls are handled by navigation.js
+ */
+
+// ── IPC Bridge Helper ─────────────────────────────────────────────
 function getIsecBridge() {
-  if (typeof window === 'undefined' || !window.isec || typeof window.isec.invoke !== 'function') {
-    return null;
+  if (typeof window !== 'undefined' && window.isec && typeof window.isec.invoke === 'function') {
+    return window.isec;
   }
-  return window.isec;
+  return null;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('ISEC UI loaded successfully');
-
-  const bridge = getIsecBridge();
-  if (!bridge) {
-    console.error('ISEC IPC bridge not available');
-    return;
-  }
-
-  const minimizeBtn = document.getElementById('minimize-window-btn');
-  if (minimizeBtn) {
-    minimizeBtn.addEventListener('click', () => bridge.invoke('minimize-window'));
-  }
-
-  const maximizeBtn = document.getElementById('maximize-window-btn');
-  if (maximizeBtn) {
-    maximizeBtn.addEventListener('click', () => bridge.invoke('maximize-window'));
-  }
-
-  const closeBtn = document.getElementById('close-window-btn');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => bridge.invoke('close-window'));
-  }
-});
-
-// Loading overlay functions
-function showLoading() {
-  document.getElementById('loading-overlay').classList.remove('hidden');
+// ── Loading Overlay ───────────────────────────────────────────────
+// Note: bootstrap.js exposes these as window.showLoading / window.hideLoading
+// Defined here as fallback for any legacy call sites
+function showLoading(msg) {
+  const ol = document.getElementById('loading-overlay');
+  if (!ol) return;
+  const p = ol.querySelector('p');
+  if (p && msg) p.textContent = msg;
+  ol.classList.remove('hidden');
 }
 
 function hideLoading() {
-  document.getElementById('loading-overlay').classList.add('hidden');
+  const ol = document.getElementById('loading-overlay');
+  if (ol) ol.classList.add('hidden');
 }
 
-// Utility functions
+// ── Date / Size Formatters ────────────────────────────────────────
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleString();
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleString();
 }
 
 function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
+  if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// ── DOM Ready guard ───────────────────────────────────────────────
+// Window control buttons are bound in navigation.js (initNavigation)
+// This file intentionally does NOT rebind them to avoid duplicate listeners.
+document.addEventListener('DOMContentLoaded', function () {
+  const bridge = getIsecBridge();
+  if (!bridge) {
+    console.warn('[ISEC] IPC bridge not available — running in standalone mode');
+  } else {
+    console.info('[ISEC] IPC bridge connected');
+  }
+});
