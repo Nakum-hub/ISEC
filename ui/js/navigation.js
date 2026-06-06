@@ -1,70 +1,60 @@
-// ISEC Navigation — View routing, window controls, top-bar updates
+// ISEC Navigation — 7-view router, window controls, top-bar live updates
 
 (function () {
   'use strict';
 
-  const VIEW_INIT_MAP = {
-    dashboard:       () => typeof initializeDashboard === 'function' && initializeDashboard(),
-    timeline:        () => typeof initTimeline        === 'function' && initTimeline(),
-    'threat-analysis': () => typeof initThreatAnalysis === 'function' && initThreatAnalysis(),
-    'audit-log':     () => typeof initAuditLog        === 'function' && initAuditLog(),
-    report:          () => typeof initReportExport    === 'function' && initReportExport(),
+  const VIEW_INIT = {
+    dashboard:        () => typeof initializeDashboard === 'function' && initializeDashboard(),
+    timeline:         () => typeof initTimeline        === 'function' && initTimeline(),
+    'threat-analysis':() => typeof initThreatAnalysis  === 'function' && initThreatAnalysis(),
+    'audit-log':      () => typeof initAuditLog         === 'function' && initAuditLog(),
+    cases:            () => typeof initCases            === 'function' && initCases(),
+    compliance:       () => typeof initCompliance       === 'function' && initCompliance(),
+    report:           () => typeof initReportExport     === 'function' && initReportExport(),
   };
 
-  const _initialised = new Set();
+  const _inited = new Set();
 
-  // ── Public navigateTo ─────────────────────────────────────────
+  // ── Navigate ──────────────────────────────────────────────────
   function navigateTo(viewId) {
-    // Hide all views
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-
-    // Show target
-    const target = document.getElementById(viewId);
-    if (target) target.classList.add('active');
-
-    // Update nav items
     document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.view === viewId);
     });
 
-    // Lazy init each view once
-    if (VIEW_INIT_MAP[viewId] && !_initialised.has(viewId)) {
-      _initialised.add(viewId);
-      VIEW_INIT_MAP[viewId]();
-    } else if (viewId === 'dashboard') {
-      // Always refresh dashboard on revisit
-      typeof initializeDashboard === 'function' && initializeDashboard();
+    const target = document.getElementById(viewId);
+    if (target) {
+      target.classList.add('active');
+      // Scroll main content to top on view switch
+      const main = document.getElementById('main-content');
+      if (main) main.scrollTop = 0;
     }
 
-    // Close detail panel when navigating away
-    if (viewId !== 'detail') {
-      const panel = document.getElementById('detail-panel');
-      if (panel && !panel.classList.contains('hidden')) {
-        panel.classList.add('hidden');
-        panel.style.display = 'none';
-      }
+    // Lazy-init each view once; always re-init dashboard for fresh data
+    if (viewId === 'dashboard') {
+      VIEW_INIT.dashboard();
+    } else if (VIEW_INIT[viewId] && !_inited.has(viewId)) {
+      _inited.add(viewId);
+      VIEW_INIT[viewId]();
     }
-  }
 
-  // ── Bind Nav Items ────────────────────────────────────────────
-  function bindNavItems() {
-    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
-      item.addEventListener('click', () => navigateTo(item.dataset.view));
-    });
+    // Close detail panel on navigation
+    const dp = document.getElementById('detail-panel');
+    if (dp && !dp.classList.contains('hidden')) {
+      dp.classList.add('hidden');
+      dp.style.display = 'none';
+    }
   }
 
   // ── Window Controls ───────────────────────────────────────────
   function bindWindowControls() {
     const bridge = window.isec;
     if (!bridge) return;
-
-    const minBtn = document.getElementById('minimize-window-btn');
-    const maxBtn = document.getElementById('maximize-window-btn');
-    const clsBtn = document.getElementById('close-window-btn');
-
-    if (minBtn) minBtn.addEventListener('click', () => bridge.invoke('window-minimize').catch(() => {}));
-    if (maxBtn) maxBtn.addEventListener('click', () => bridge.invoke('window-maximize').catch(() => {}));
-    if (clsBtn) clsBtn.addEventListener('click', () => bridge.invoke('window-close').catch(() => {}));
+    const actions = { 'minimize-window-btn':'window-minimize', 'maximize-window-btn':'window-maximize', 'close-window-btn':'window-close' };
+    Object.entries(actions).forEach(([id, evt]) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener('click', () => bridge.invoke(evt).catch(() => {}));
+    });
   }
 
   // ── Top Bar Live Update ───────────────────────────────────────
@@ -77,46 +67,39 @@
         bridge.invoke('get-system-integrity').catch(() => null),
       ]);
 
+      const compromised = (integrity && integrity.status === 'compromised') || (status && status.tamperingDetected);
       const dot   = document.getElementById('top-chain-dot');
       const label = document.getElementById('top-chain-label');
       const evLbl = document.getElementById('top-evidence-label');
-
-      const compromised = (integrity && integrity.status === 'compromised') || (status && status.tamperingDetected);
 
       if (dot) {
         dot.style.background  = compromised ? 'var(--danger)' : 'var(--success)';
         dot.style.boxShadow   = compromised ? '0 0 6px var(--danger)' : '0 0 6px var(--success)';
         dot.style.animation   = compromised ? 'pulse-danger 1s ease-in-out infinite' : 'pulse-success 2s ease-in-out infinite';
       }
-      if (label) label.textContent = compromised ? 'Chain Broken!' : 'Chain Intact';
+      if (label) label.textContent = compromised ? '⚠ Chain Broken' : 'Chain Intact';
+      if (label) label.style.color = compromised ? 'var(--danger)' : '';
 
-      // Evidence count
-      const count = (status && typeof status.evidenceItemsCount === 'number')
-        ? status.evidenceItemsCount
-        : 0;
+      const count = (status && typeof status.evidenceItemsCount === 'number') ? status.evidenceItemsCount : 0;
       if (evLbl) evLbl.textContent = count.toLocaleString() + ' Evidence Item' + (count !== 1 ? 's' : '');
 
       // Threat badge
       const badge = document.getElementById('threat-badge');
-      if (badge) {
-        if (compromised || (status && status.tamperingDetected)) {
-          badge.style.display = 'block';
-        } else {
-          badge.style.display = 'none';
-        }
-      }
+      if (badge) badge.style.display = (compromised || (status && status.tamperingDetected)) ? 'block' : 'none';
     } catch (_) {}
   }
 
-  // ── Init ─────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────
   function initNavigation() {
-    bindNavItems();
+    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+      item.addEventListener('click', () => navigateTo(item.dataset.view));
+    });
     bindWindowControls();
     updateTopBar();
     setInterval(updateTopBar, 30000);
   }
 
-  window.navigateTo   = navigateTo;
+  window.navigateTo     = navigateTo;
   window.initNavigation = initNavigation;
-  window.updateTopBar = updateTopBar;
+  window.updateTopBar   = updateTopBar;
 })();

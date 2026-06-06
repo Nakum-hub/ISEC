@@ -466,12 +466,13 @@ async function startEvidenceCollection(options = {}) {
       }
     }
 
-    showLoading();
-    const notify = ISECNotify && ISECNotify.loading('Collecting evidence...');
+    // Open live terminal BEFORE calling backend
+    const termHandle = typeof ISECTerminal !== 'undefined' ? ISECTerminal.open(collectTypes || []) : null;
+
     const result = await bridge.invoke('start-evidence-collection', { types: collectTypes || [] });
-    notify && notify.dismiss();
 
     if (result.success) {
+      // Terminal auto-finishes via its own timer; just sync the count
       ISECNotify && ISECNotify.success(`Collection complete — ${result.evidenceCount || 0} items secured.`);
 
       const totalEl = document.getElementById('total-evidence');

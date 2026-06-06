@@ -1,0 +1,30 @@
+<section id="compliance" class="view">
+  <div class="section-header scan-header mb-20">
+    <div>
+      <div class="section-title">Compliance</div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">NIST CSF 2.0 · ISO 27001 · GDPR Evidence Coverage</div>
+    </div>
+    <div class="section-actions">
+      <button class="btn btn-secondary" id="compliance-export-btn">Export Matrix</button>
+      <button class="btn btn-primary" id="compliance-refresh-btn">Refresh Coverage</button>
+    </div>
+  </div>
+
+  <!-- Overall Score Banner -->
+  <div class="glassmorphism" style="padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:24px;">
+    <div style="text-align:center;flex-shrink:0;">
+      <div style="font-family:var(--font-mono);font-size:0.6rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Overall Coverage</div>
+      <div id="compliance-pct" style="font-family:var(--font-mono);font-size:3rem;font-weight:800;color:var(--success);line-height:1;">0%</div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:3px;" id="compliance-status">Calculating…</div>
+    </div>
+    <div style="flex:1;">
+      <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin-bottom:14px;">
+        <div id="compliance-bar" style="height:100%;border-radius:4px;width:0%;transition:width 1s ease;background:var(--success);box-shadow:0 0 10px var(--success);"></div>
+      </div>
+      <div id="compliance-framework-pills" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+  <!-- Framework Grid -->
+  <div id="compliance-grid" style="display:flex;flex-direction:column;gap:14px;"></div>
+</section>

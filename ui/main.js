@@ -22,6 +22,8 @@ const allowedUiFragments = new Set([
   'views/timeline.html',
   'views/threat-analysis.html',
   'views/audit-log.html',
+  'views/cases.html',
+  'views/compliance.html',
   'components/evidence-detail-panel.html',
   'components/stat-card.html',
   'components/timeline-item.html',

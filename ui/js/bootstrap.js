@@ -1,9 +1,35 @@
-// ISEC Bootstrap — Fragment loader, UI init sequencer, global helpers
+// ISEC Bootstrap — Fragment loader, boot sequence, UI init sequencer
 
 (function () {
   'use strict';
 
-  // ── Global helpers (used by multiple modules) ─────────────────
+  // ── Boot Sequence ─────────────────────────────────────────────
+  const BOOT_STEPS = [
+    [0,   'Verifying cryptographic keys…'],
+    [400, 'Loading evidence database…'],
+    [800, 'Validating license…'],
+    [1100,'Checking hash chain integrity…'],
+    [1400,'Loading UI fragments…'],
+    [1800,'Initialising modules…'],
+    [2100,'Ready.'],
+  ];
+
+  function runBootSequence() {
+    const statusEl = document.getElementById('boot-status-text');
+    BOOT_STEPS.forEach(([delay, msg]) => {
+      setTimeout(() => { if (statusEl) statusEl.textContent = msg; }, delay);
+    });
+    return new Promise(resolve => setTimeout(resolve, 2300));
+  }
+
+  function dismissBootScreen() {
+    const screen = document.getElementById('boot-screen');
+    if (!screen) return;
+    screen.classList.add('fade-out');
+    setTimeout(() => screen.remove(), 650);
+  }
+
+  // ── Global helpers ────────────────────────────────────────────
   window.showLoading = function (msg) {
     const ol = document.getElementById('loading-overlay');
     if (!ol) return;
@@ -21,52 +47,36 @@
   async function loadFragment(containerId, fragmentPath) {
     const container = document.getElementById(containerId);
     if (!container) return;
-
     const bridge = window.isec;
-    if (!bridge || typeof bridge.invoke !== 'function') {
-      container.innerHTML = `<div class="empty-state"><span>IPC bridge unavailable — running in standalone mode.</span></div>`;
-      return;
-    }
-
+    if (!bridge || typeof bridge.invoke !== 'function') return;
     try {
       const html = await bridge.invoke('read-ui-fragment', { fragmentPath });
-      if (html && typeof html === 'string') {
-        container.innerHTML = html;
-      } else {
-        container.innerHTML = `<div class="empty-state"><span>Fragment not found: ${fragmentPath}</span></div>`;
-      }
+      if (html && typeof html === 'string') container.innerHTML = html;
     } catch (err) {
-      console.error(`Fragment load error [${fragmentPath}]:`, err);
-      // Fallback: try finding the view already in DOM (for dev/standalone)
-      const id = fragmentPath.replace('views/', '').replace('.html', '').replace('components/', '');
-      const existing = document.getElementById(id);
-      if (!existing) {
-        container.innerHTML = `<div class="empty-state"><span>Failed to load: ${fragmentPath}</span></div>`;
-      }
+      console.warn(`Fragment load failed [${fragmentPath}]:`, err.message);
     }
   }
 
   // ── Profile Panel ─────────────────────────────────────────────
   function initProfilePanel() {
-    const btn      = document.getElementById('profile-btn');
-    const panel    = document.getElementById('profile-panel');
-    const closeBtn = document.getElementById('profile-close-btn');
-
+    const btn   = document.getElementById('profile-btn');
+    const panel = document.getElementById('profile-panel');
+    const close = document.getElementById('profile-close-btn');
     if (!btn || !panel) return;
 
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', e => {
       e.stopPropagation();
       const open = !panel.classList.contains('hidden');
       panel.classList.toggle('hidden', open);
       btn.setAttribute('aria-expanded', String(!open));
     });
 
-    if (closeBtn) closeBtn.addEventListener('click', () => {
+    close && close.addEventListener('click', () => {
       panel.classList.add('hidden');
       btn.setAttribute('aria-expanded', 'false');
     });
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', e => {
       if (!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target !== btn) {
         panel.classList.add('hidden');
         btn.setAttribute('aria-expanded', 'false');
@@ -74,7 +84,7 @@
     });
   }
 
-  // ── Profile Data Loader ───────────────────────────────────────
+  // ── Profile Data ──────────────────────────────────────────────
   async function loadProfileData() {
     const bridge = window.isec;
     if (!bridge) return;
@@ -85,74 +95,80 @@
         bridge.invoke('get-system-integrity').catch(() => null),
       ]);
 
-      const role = (status && status.role) || 'unknown';
+      const role  = (status && status.role) || 'unknown';
       const perms = (status && Array.isArray(status.permissions)) ? status.permissions.join(', ') : '—';
-      const lic = (status && status.license) ? (status.license.valid ? `${status.license.plan || 'Licensed'}` : 'Invalid') : '—';
-      const evCount = (status && typeof status.evidenceItemsCount === 'number') ? status.evidenceItemsCount : 0;
-      const ret = retention ? `${retention.retention_days || '—'}d | ${retention.active_evidence || 0} active` : '—';
-      const intLabel = (integrity && integrity.status === 'compromised') || (status && status.tamperingDetected) ? '⚠ COMPROMISED' : '✓ VERIFIED';
+      const lic   = (status && status.license) ? (status.license.valid ? (status.license.plan || 'Licensed') : 'Invalid') : '—';
+      const evCnt = (status && typeof status.evidenceItemsCount === 'number') ? status.evidenceItemsCount : 0;
+      const ret   = retention ? `${retention.retention_days || '—'}d | ${retention.active_evidence || 0} active` : '—';
+      const intOk = !(integrity && integrity.status === 'compromised') && !(status && status.tamperingDetected);
 
-      setText('profile-role',           role.toUpperCase());
-      setText('profile-permissions',     perms);
-      setText('profile-license',         lic);
-      setText('profile-evidence-count',  evCount.toLocaleString());
-      setText('profile-retention',       ret);
-      setText('profile-integrity',       intLabel);
-      setText('current-role-label',      role);
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      set('profile-role',           role.toUpperCase());
+      set('profile-permissions',    perms);
+      set('profile-license',        lic);
+      set('profile-evidence-count', evCnt.toLocaleString());
+      set('profile-retention',      ret);
+      set('profile-integrity',      intOk ? '✓ VERIFIED' : '⚠ COMPROMISED');
+      set('current-role-label',     role);
 
-      // Avatar role icon
-      const avatarEl = document.getElementById('user-avatar-icon');
-      if (avatarEl) {
-        const icons = { collector:'🔍', reviewer:'👁', exporter:'📤' };
-        avatarEl.textContent = icons[role] || '👤';
-      }
+      const icons = { collector:'🔍', reviewer:'👁', exporter:'📤' };
+      const av = document.getElementById('user-avatar-icon');
+      if (av) av.textContent = icons[role] || '👤';
+
+      const sel = document.getElementById('role-select');
+      if (sel && role !== 'unknown') sel.value = role;
     } catch (err) {
       console.error('Profile load error:', err);
     }
   }
 
-  function setText(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-  }
-
-  // ── Main Bootstrap Sequence ───────────────────────────────────
+  // ── Bootstrap ─────────────────────────────────────────────────
   async function bootstrap() {
-    // 1. Load HTML fragments
+    // 1. Run boot animation in parallel with data loading
+    const bootPromise = runBootSequence();
+
+    // 2. Load all fragments simultaneously
     await Promise.all([
-      loadFragment('dashboard-container',     'views/dashboard.html'),
-      loadFragment('timeline-container',      'views/timeline.html'),
+      loadFragment('dashboard-container',      'views/dashboard.html'),
+      loadFragment('timeline-container',       'views/timeline.html'),
       loadFragment('threat-analysis-container','views/threat-analysis.html'),
-      loadFragment('audit-log-container',     'views/audit-log.html'),
-      loadFragment('detail-panel-container',  'components/evidence-detail-panel.html'),
+      loadFragment('audit-log-container',      'views/audit-log.html'),
+      loadFragment('cases-container',          'views/cases.html'),
+      loadFragment('compliance-container',     'views/compliance.html'),
+      loadFragment('detail-panel-container',   'components/evidence-detail-panel.html'),
     ]);
 
-    // 2. Boot navigation
+    // 3. Wait for boot animation to finish
+    await bootPromise;
+
+    // 4. Dismiss boot screen with fade
+    dismissBootScreen();
+
+    // 5. Init navigation
     if (typeof initNavigation === 'function') initNavigation();
 
-    // 3. Boot profile
+    // 6. Init profile + detail
     initProfilePanel();
+    if (typeof initDetailView === 'function') initDetailView();
+
+    // 7. Load profile data
     await loadProfileData();
     setInterval(loadProfileData, 60000);
 
-    // 4. Boot detail view
-    if (typeof initDetailView === 'function') initDetailView();
-
-    // 5. Boot dashboard (active view on load)
-    if (typeof initializeDashboard === 'function') initializeDashboard();
-
-    // 6. Boot report export (pre-init so preview works immediately)
-    if (typeof initReportExport === 'function') initReportExport();
-
-    // 7. Sync role selector to current backend role
+    // 8. Sync role selector
     if (typeof syncRoleSelect === 'function') syncRoleSelect();
 
-    // 8. Mark app ready
+    // 9. Boot active view (dashboard)
+    if (typeof initializeDashboard === 'function') initializeDashboard();
+
+    // 10. Pre-init report export
+    if (typeof initReportExport === 'function') initReportExport();
+
+    // 11. Ready
     document.body.classList.add('app-ready');
-    console.info('[ISEC] Bootstrap complete');
+    console.info('[ISEC] Bootstrap complete — v2.0 Enterprise');
   }
 
-  // Run after DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootstrap);
   } else {
