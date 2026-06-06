@@ -73,6 +73,7 @@ async function loadDashboardStats() {
     renderEvidenceTypeBars(status, _cachedTimeline);
     renderSparkline(_cachedTimeline);
     updateHealthStatusRow(integrity, status);
+    await loadRealReportsCount(bridge);
   } catch (err) {
     console.error('Dashboard load error:', err);
   }
@@ -471,8 +472,14 @@ async function startEvidenceCollection(options = {}) {
 
     const result = await bridge.invoke('start-evidence-collection', { types: collectTypes || [] });
 
+    // Finish terminal with REAL backend data (evidenceCount, typeCounts, integrityStatus)
+    if (termHandle && typeof termHandle.finish === 'function') {
+      termHandle.finish(result);
+    } else if (typeof ISECTerminal !== 'undefined') {
+      ISECTerminal.finish(result);
+    }
+
     if (result.success) {
-      // Terminal auto-finishes via its own timer; just sync the count
       ISECNotify && ISECNotify.success(`Collection complete — ${result.evidenceCount || 0} items secured.`);
 
       const totalEl = document.getElementById('total-evidence');
@@ -486,6 +493,7 @@ async function startEvidenceCollection(options = {}) {
 
       await loadDashboardStats();
     } else {
+      if (typeof ISECTerminal !== 'undefined') ISECTerminal.fail(result.message || 'Collection failed.');
       ISECNotify && ISECNotify.error(result.message || 'Collection failed.');
     }
   } catch (err) {
@@ -549,6 +557,25 @@ async function applyUpdate() {
   } catch (err) {
     ISECNotify && ISECNotify.error('Update failed: ' + err.message);
   }
+}
+
+
+// ── Real Reports Count from Disk ──────────────────────────────
+async function loadRealReportsCount(bridge) {
+  try {
+    const resp = await bridge.invoke('get-reports-list');
+    if (resp && typeof resp.count === 'number') {
+      const el = document.getElementById('reports-count');
+      if (el) {
+        const prev = parseInt(el.textContent.replace(/,/g, ''), 10) || 0;
+        if (prev !== resp.count && typeof ISECCharts !== 'undefined') {
+          ISECCharts.animateValue(el, prev, resp.count, 600);
+        } else {
+          el.textContent = resp.count;
+        }
+      }
+    }
+  } catch (_) {}
 }
 
 // ── Public Exports ────────────────────────────────────────────────

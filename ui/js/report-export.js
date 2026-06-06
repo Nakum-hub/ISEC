@@ -6,12 +6,56 @@
   let _evidenceData = null;
   let _reportHistory = JSON.parse(localStorage.getItem('isec_reports') || '[]');
 
-  function initReportExport() {
+  async function initReportExport() {
     setupCheckboxes();
     setupFormatToggle();
     setupButtons();
+    await loadRealReportHistory();
     updatePreview();
     renderReportHistory();
+  }
+
+  // Load real report files from disk to populate history on startup
+  async function loadRealReportHistory() {
+    const bridge = window.isec;
+    if (!bridge) return;
+    try {
+      const resp = await bridge.invoke('get-reports-list');
+      if (!resp || !resp.success || !Array.isArray(resp.reports)) return;
+
+      // Build history entries from real files (only add ones not already tracked)
+      const existing = new Set(_reportHistory.map(r => r.path));
+      let added = 0;
+      resp.reports.forEach(file => {
+        if (existing.has(file.path)) return;
+        // Parse format and types from filename: forensic_report_20260128_181244.pdf
+        const match = file.name.match(/forensic_report_(\d{8})_(\d{6})/);
+        const ts = match
+          ? new Date(`${match[1].slice(0,4)}-${match[1].slice(4,6)}-${match[1].slice(6,8)}T${match[2].slice(0,2)}:${match[2].slice(2,4)}:${match[2].slice(4,6)}`).getTime()
+          : file.mtime;
+        _reportHistory.push({
+          types: ['system_logs','browser_history','network_connections','file_metadata'],
+          format: 'pdf',
+          sections: ['summary','chain','evidence','integrity'],
+          caseName: '',
+          analyst: '',
+          path: file.path,
+          ts: new Date(ts).toISOString(),
+          count: '—',
+          fromDisk: true,
+        });
+        added++;
+      });
+      if (added > 0) {
+        _reportHistory.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+        try { localStorage.setItem('isec_reports', JSON.stringify(_reportHistory)); } catch(_) {}
+        // Update dashboard count
+        const el = document.getElementById('reports-count');
+        if (el) el.textContent = _reportHistory.length;
+      }
+    } catch (err) {
+      console.warn('Could not load real report list:', err.message);
+    }
   }
 
   function setupCheckboxes() {
