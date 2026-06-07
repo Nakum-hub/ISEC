@@ -855,3 +855,10 @@ Startup check - output_dir_writable: OK
 Startup check - database_accessible: OK
 Hash chain verification passed - Evidence collection proceeding...
 Error loading consents: 
+2026-06-06 22:19:39,582 [INFO] src.utils.logging_setup: Logging initialized: evidence_output/isec.log
+Startup check - output_dir_exists: OK
+Startup check - output_dir_writable: OK
+Startup check - database_accessible: OK
+Hash chain verification passed - Evidence collection proceeding...
+Error loading consents: 
+Browser history collection requires explicit consent. Collection will be skipped.

@@ -625,9 +625,16 @@ function createWindow() {
     vibrancy: 'dark' // macOS vibrancy effect
   });
 
-  // Load the index.html file
-  const indexPath = path.join(__dirname, 'index.html');
-  mainWindow.loadFile(indexPath);
+  // First-run detection: show setup wizard if not yet configured
+  const indexPath   = path.join(__dirname, 'index.html');
+  const wizardPath  = path.join(__dirname, 'setup-wizard.html');
+  if (shouldShowWizard()) {
+    mainWindow.loadFile(wizardPath);
+    console.info('[ISEC] First run — loading setup wizard');
+  } else {
+    mainWindow.loadFile(indexPath);
+    console.info('[ISEC] Setup complete — loading main app');
+  }
 
   mainWindow.once('ready-to-show', () => {
     try {
@@ -1382,3 +1389,195 @@ ipcMain.handle('get-reports-list', async () => {
 // ── Record role changes as real audit events ────────────────────
 // Patch: intercept successful set-user-role to log real event
 const _origSetUserRoleHandler = ipcMain.listeners ? null : null; // patch via event after handler runs
+
+// ══════════════════════════════════════════════════════════════
+// FIRST-RUN SETUP SYSTEM
+// ══════════════════════════════════════════════════════════════
+
+
+// ── Setup state helpers ───────────────────────────────────────
+function getSetupFlagPath() {
+  return path.join(getStateDir(), '.setup_complete');
+}
+
+function isSetupComplete() {
+  const flagPath = getSetupFlagPath();
+  const tokenPath = path.join(getStateDir(), 'keys', 'role_admin_token.txt');
+  const licPath = process.env.ISEC_LICENSE_FILE || path.join(getStateDir(), 'license.json');
+  return fs.existsSync(flagPath) && fs.existsSync(tokenPath) && fs.existsSync(licPath);
+}
+
+function markSetupComplete() {
+  try {
+    const flagPath = getSetupFlagPath();
+    fs.mkdirSync(path.dirname(flagPath), { recursive: true });
+    fs.writeFileSync(flagPath, new Date().toISOString(), 'utf-8');
+  } catch (e) {
+    console.error('Could not write setup flag:', e.message);
+  }
+}
+
+// Auto-generate a cryptographically secure admin token
+function generateSecureToken() {
+  return 'ISEC-' + crypto.randomBytes(12).toString('hex').toUpperCase() +
+         '-' + crypto.randomBytes(8).toString('hex').toUpperCase();
+}
+
+function saveAdminToken(token) {
+  const tokenDir  = path.join(getStateDir(), 'keys');
+  const tokenPath = path.join(tokenDir, 'role_admin_token.txt');
+  fs.mkdirSync(tokenDir, { recursive: true });
+  fs.writeFileSync(tokenPath, token, { encoding: 'utf-8', mode: 0o600 });
+  return tokenPath;
+}
+
+// ── Load setup wizard OR main app ────────────────────────────
+// Called from createMainWindow (intercepts the loadFile)
+function shouldShowWizard() {
+  return !isSetupComplete();
+}
+
+// ── Setup IPC Handlers ────────────────────────────────────────
+
+// setup-activate-license: validate and save license to state dir
+ipcMain.handle('setup-activate-license', async (event, { licenseJson }) => {
+  try {
+    if (!licenseJson) return { success: false, message: 'No license data provided.' };
+
+    let parsed;
+    try { parsed = JSON.parse(licenseJson); }
+    catch (_) { return { success: false, message: 'Invalid JSON format.' }; }
+
+    if (!parsed.payload || !parsed.signature) {
+      return { success: false, message: 'Missing payload or signature in license file.' };
+    }
+
+    // Save license to state dir
+    const licPath = path.join(getStateDir(), 'license.json');
+    fs.mkdirSync(path.dirname(licPath), { recursive: true });
+    fs.writeFileSync(licPath, JSON.stringify(parsed, null, 2), 'utf-8');
+
+    // Verify via backend
+    const res = await runPythonAction('status', ['--license-file', licPath]).catch(() => null);
+    if (res && res.json && res.json.license && res.json.license.valid) {
+      const lic = res.json.license;
+      return {
+        success:  true,
+        plan:     lic.plan || 'Unknown',
+        expires:  lic.expires_at ? lic.expires_at.slice(0, 10) : 'Never',
+        customer: lic.customer || '',
+        message:  'License validated successfully.',
+      };
+    }
+
+    // If backend says invalid, remove the saved license
+    try { fs.unlinkSync(licPath); } catch (_) {}
+    const msg = res && res.json && res.json.license ? res.json.license.message : 'Validation failed.';
+    return { success: false, message: msg || 'License not accepted by backend.' };
+
+  } catch (err) {
+    console.error('setup-activate-license error:', err);
+    return { success: false, message: err.message || 'Unexpected error during license activation.' };
+  }
+});
+
+// setup-test-backend: verify Python, DB, dirs, keys
+ipcMain.handle('setup-test-backend', async () => {
+  const result = {
+    pythonOk: false, pythonVersion: '',
+    backendOk: false, backendMessage: '',
+    dbOk: false, dbMessage: '',
+    dirsOk: false, dirsMessage: '',
+    keysOk: false, keysMessage: '',
+  };
+
+  try {
+    // 1. Check Python exists
+    const { execFileSync } = require('child_process');
+    const backendPaths = getBackendPaths();
+    try {
+      const ver = execFileSync(backendPaths.pythonPath, ['--version'], { timeout: 5000 }).toString().trim();
+      result.pythonOk = true;
+      result.pythonVersion = ver;
+    } catch (_) {
+      result.pythonVersion = 'Python not found. Install Python 3.10+ and retry.';
+      return result;
+    }
+
+    // 2. Test backend status action
+    const res = await runPythonAction('status', []).catch(e => ({ error: e.message }));
+    if (res && res.json) {
+      result.backendOk = true;
+      result.backendMessage = 'Backend engine responding';
+    } else {
+      result.backendMessage = (res && res.error) || 'Backend did not respond';
+      return result;
+    }
+
+    // 3. Check / create dirs
+    const storage = getStoragePaths();
+    try {
+      fs.mkdirSync(storage.evidenceDir, { recursive: true });
+      fs.mkdirSync(getStateDir(),        { recursive: true });
+      fs.mkdirSync(path.join(getStateDir(), 'keys'), { recursive: true });
+      result.dirsOk = true;
+      result.dirsMessage = 'Data directories created';
+    } catch (e) {
+      result.dirsMessage = 'Cannot create directories: ' + e.message;
+      return result;
+    }
+
+    // 4. Check DB
+    const dbPath = path.join(storage.evidenceDir, 'evidence.db');
+    result.dbOk = true; // DB is created on first backend call
+    result.dbMessage = fs.existsSync(dbPath) ? 'Database exists' : 'Database will be created on first collection';
+
+    // 5. Check license key file
+    const pubKeyPath = resolvePackagedLicensePublicKeyPath();
+    if (pubKeyPath && fs.existsSync(pubKeyPath)) {
+      result.keysOk = true;
+      result.keysMessage = 'License public key loaded';
+    } else {
+      result.keysMessage = 'License public key not found';
+    }
+
+  } catch (err) {
+    console.error('setup-test-backend error:', err);
+    result.backendMessage = err.message;
+  }
+
+  return result;
+});
+
+// setup-generate-token: create + save a secure admin token
+ipcMain.handle('setup-generate-token', async () => {
+  try {
+    const token = generateSecureToken();
+    saveAdminToken(token);
+    recordSessionEvent('AUTH', 'Admin Token Generated',
+      'Secure admin token created during setup wizard', 'setup', 'success');
+    return { success: true, token };
+  } catch (err) {
+    console.error('setup-generate-token error:', err);
+    return { success: false, message: err.message };
+  }
+});
+
+// setup-complete: mark setup done, reload main window with main app
+ipcMain.handle('setup-complete', async () => {
+  try {
+    markSetupComplete();
+    recordSessionEvent('SYSTEM', 'Setup Completed',
+      'First-run setup wizard completed successfully', 'setup', 'success');
+    // Reload the main window with the actual app
+    if (mainWindow) {
+      const indexPath = app.isPackaged
+        ? path.join(__dirname, 'index.html')
+        : path.join(__dirname, 'index.html');
+      mainWindow.loadFile(indexPath);
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+});
