@@ -13,7 +13,7 @@ Pillow>=12.2.0
 reportlab>=4.2.5
 
 # Networking utilities
-requests>=2.32.3
+requests>=2.34.2
 
 # psutil for network connections and process info
 psutil>=6.1.1
