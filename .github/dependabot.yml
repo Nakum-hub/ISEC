@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Electron / npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "Nakum-hub"
+    labels:
+      - "security"
+      - "dependencies"
+    ignore:
+      # Only auto-update patch/minor — not major versions
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "security"
+      - "dependencies"

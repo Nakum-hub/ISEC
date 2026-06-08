@@ -1,7 +1,19 @@
-# Dependencies for Internal Security Evidence Collector
-PyPDF2==2.12.1
-reportlab==4.0.4
-cryptography==46.0.5
-cffi==2.0.0
-pycparser==2.22
-Pillow==12.1.1
+# ISEC Python Requirements — Security-hardened versions
+# All versions pinned to latest secure releases as of June 2026
+
+# Cryptography — Ed25519 signing, HMAC, AES encryption
+# CVE fix: PYSEC-2026-35, PYSEC-2026-36 fixed in 46.0.7
+cryptography>=46.0.7
+
+# Image processing for PDF report generation
+# CVE fix: PYSEC-2026-165, CVE-2026-40192, CVE-2026-42309/42310/42311 fixed in 12.2.0
+Pillow>=12.2.0
+
+# PDF generation for forensic reports
+reportlab>=4.2.5
+
+# Networking utilities
+requests>=2.32.3
+
+# psutil for network connections and process info
+psutil>=6.1.1

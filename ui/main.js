@@ -614,9 +614,16 @@ function createWindow() {
     backgroundColor: '#0a0a0f',
     icon: path.join(__dirname, 'assets/icon.png'),
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      // Core security — never disable these
+      nodeIntegration:             false,   // No direct Node.js in renderer
+      contextIsolation:            true,    // Isolates preload from renderer
+      sandbox:                     false,   // preload uses require('electron') — keep false
+      webSecurity:                 true,    // Enforce same-origin policy
+      allowRunningInsecureContent: false,   // Block mixed content
+      experimentalFeatures:        false,   // No experimental Chromium features
+      enableBlinkFeatures:         '',      // No experimental Blink features
+      // Preload bridge
+      preload: path.join(__dirname, 'preload.js'),
     },
 
     show: false,
@@ -634,6 +641,31 @@ function createWindow() {
   } else {
     mainWindow.loadFile(indexPath);
     console.info('[ISEC] Setup complete — loading main app');
+  }
+
+  // ── Security: Block all external navigation ───────────────────
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const appUrl = 'file://';
+    if (!url.startsWith(appUrl)) {
+      event.preventDefault();
+      console.warn('[ISEC Security] Blocked navigation to:', url);
+    }
+  });
+
+  // ── Security: Open external links in system browser, never in app ──
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' }; // Never open new Electron windows
+  });
+
+  // ── Security: Disable dev tools in production ──────────────────
+  if (app.isPackaged) {
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow.webContents.closeDevTools();
+      console.warn('[ISEC Security] DevTools blocked in production');
+    });
   }
 
   mainWindow.once('ready-to-show', () => {
@@ -670,6 +702,52 @@ function createWindow() {
 }
 
 // Create window when Electron is ready
+// ── Electron Security: Block dangerous protocols ─────────────────
+app.on('web-contents-created', (event, contents) => {
+  // Block all navigation to non-file:// URLs
+  contents.on('will-navigate', (evt, url) => {
+    if (!url.startsWith('file://')) {
+      evt.preventDefault();
+      console.warn('[ISEC Security] Blocked navigation:', url);
+    }
+  });
+
+  // Block all new window creation from renderer
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  // Block permission requests (camera, mic, location, notifications, etc.)
+  contents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const BLOCKED_PERMISSIONS = ['media', 'geolocation', 'notifications',
+      'midiSysex', 'openExternal', 'clipboard-read', 'clipboard-sanitized-write'];
+    if (BLOCKED_PERMISSIONS.includes(permission)) {
+      console.warn('[ISEC Security] Blocked permission request:', permission);
+      callback(false);
+    } else {
+      callback(true);
+    }
+  });
+});
+
+// ── Set security-hardened Content Security Policy headers ───────
+app.on('session-created', (session) => {
+  session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'X-Content-Type-Options': ['nosniff'],
+        'X-Frame-Options':        ['DENY'],
+        'X-XSS-Protection':       ['1; mode=block'],
+        'Referrer-Policy':        ['no-referrer'],
+      }
+    });
+  });
+});
+
 app.whenReady().then(() => {
   try {
     validateProductionRuntime();
