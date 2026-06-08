@@ -3,7 +3,7 @@
 
 # Cryptography — Ed25519 signing, HMAC, AES encryption
 # CVE fix: PYSEC-2026-35, PYSEC-2026-36 fixed in 46.0.7
-cryptography>=46.0.7
+cryptography>=48.0.0
 
 # Image processing for PDF report generation
 # CVE fix: PYSEC-2026-165, CVE-2026-40192, CVE-2026-42309/42310/42311 fixed in 12.2.0
