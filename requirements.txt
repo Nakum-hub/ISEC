@@ -16,4 +16,4 @@ reportlab>=4.2.5
 requests>=2.32.3
 
 # psutil for network connections and process info
-psutil>=6.1.1
+psutil>=7.2.2
