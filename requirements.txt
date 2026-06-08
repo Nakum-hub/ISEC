@@ -10,7 +10,7 @@ cryptography>=46.0.7
 Pillow>=12.2.0
 
 # PDF generation for forensic reports
-reportlab>=4.2.5
+reportlab>=4.5.1
 
 # Networking utilities
 requests>=2.32.3
