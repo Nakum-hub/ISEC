@@ -2,7 +2,7 @@
   "name": "isec-desktop-app",
   "productName": "ISEC",
   "version": "2.0.0",
-  "description": "Internal Security Evidence Collector — Enterprise forensic evidence platform",
+  "description": "Internal Security Evidence Collector \u2014 Enterprise forensic evidence platform",
   "main": "main.js",
   "author": {
     "name": "ISEC Team"
@@ -22,10 +22,17 @@
     "electron-is-dev": "3.0.1"
   },
   "devDependencies": {
-    "electron": "^35.0.0",
+    "electron": "42.3.3",
     "electron-builder": "^26.0.0"
   },
   "overrides": {
+    "electron": "42.3.3",
+    "ip-address": "10.2.0",
+    "lodash": "4.18.1",
+    "minimatch": ">=9.0.5",
+    "picomatch": ">=4.0.4",
+    "tar": ">=7.5.11",
+    "tmp": "0.2.7",
     "@xmldom/xmldom": ">=0.9.7",
     "ajv": ">=8.17.1",
     "brace-expansion": ">=2.0.2",
@@ -34,12 +41,15 @@
     "tough-cookie": ">=4.1.4",
     "nth-check": ">=2.1.1",
     "node-fetch": ">=2.7.0",
-    "ws": ">=8.17.1"
+    "ws": ">=8.17.1",
+    "glob": ">=10.4.5",
+    "got": ">=12.6.1",
+    "micromatch": ">=4.0.8"
   },
   "build": {
     "appId": "com.isec.evidencecollector",
     "productName": "ISEC",
-    "copyright": "Copyright © 2026 ISEC Team",
+    "copyright": "Copyright \u00a9 2026 ISEC Team",
     "asar": true,
     "asarUnpack": [
       "backend_dist/**/*",
@@ -49,7 +59,9 @@
       {
         "from": "backend_dist",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../keys/license_public_key.pem",
@@ -64,7 +76,14 @@
       "!**/*.ts"
     ],
     "win": {
-      "target": [{"target": "nsis", "arch": ["x64"]}],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico",
       "publisherName": "ISEC",
       "verifyUpdateCodeSignature": false,
@@ -76,26 +95,28 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ISEC Evidence Collector",
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false
     },
     "mac": {
-      "target": [{"target": "dmg", "arch": ["x64", "arm64"]}],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.utilities",
       "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
-    },
-    "dmg": {
-      "title": "ISEC Evidence Collector",
-      "backgroundColor": "#020609"
+      "gatekeeperAssess": false
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.png",
       "category": "Utility"
     }
