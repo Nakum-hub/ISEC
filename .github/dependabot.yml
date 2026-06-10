@@ -1,27 +1,22 @@
 version: 2
 updates:
-  # Electron / npm dependencies
+  # npm — monitor but do NOT auto-create branches/PRs
+  # We handle all dependency updates manually in the main branch
   - package-ecosystem: "npm"
     directory: "/ui"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "Nakum-hub"
+    open-pull-requests-limit: 0    # ← Disables auto-branch creation
     labels:
       - "security"
       - "dependencies"
-    ignore:
-      # Only auto-update patch/minor — not major versions
-      - dependency-name: "electron"
-        update-types: ["version-update:semver-major"]
 
-  # Python dependencies
+  # Python — monitor but do NOT auto-create branches/PRs
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0    # ← Disables auto-branch creation
     labels:
       - "security"
       - "dependencies"
