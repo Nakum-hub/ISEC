@@ -35,27 +35,27 @@ jobs:
       - name: Generate SBOM
         run: |
           mkdir -p dist sbom
-          python scripts/generate_sbom.py -o sbom/isec-python.cdx.json --app-version "$ github.ref_name "
+          python scripts/generate_sbom.py -o sbom/isec-python.cdx.json --app-version "$GITHUB_REF_NAME"
           cp sbom/isec-python.cdx.json dist/
 
       - name: Package source tarball
-        run: git archive --format=tar.gz -o "dist/isec-$ github.ref_name -source.tar.gz" HEAD
+        run: git archive --format=tar.gz -o dist/isec-source.tar.gz HEAD
 
       - name: Generate checksum manifest
-        run: python scripts/generate_release_manifest.py dist/ --app-version "$ github.ref_name "
+        run: python scripts/generate_release_manifest.py dist/ --app-version "$GITHUB_REF_NAME"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: |
-            dist/isec-$ github.ref_name -source.tar.gz
+            dist/isec-source.tar.gz
             dist/isec-python.cdx.json
 
       - name: Publish release artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/isec-$ github.ref_name -source.tar.gz
+            dist/isec-source.tar.gz
             dist/isec-python.cdx.json
             dist/SHA256SUMS
             dist/release-manifest.json
