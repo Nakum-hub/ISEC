@@ -97,3 +97,24 @@ def iter_collector_classes() -> Iterator[Type[BaseCollector]]:
     """Iterate registered collector classes in stable (sorted) order."""
     for evidence_type in sorted(_REGISTRY):
         yield _REGISTRY[evidence_type]
+
+
+def build_collectors(storage, actor, workstation_id, ip_address) -> Dict[str, BaseCollector]:
+    """Instantiate every registered collector with the shared constructor.
+
+    Returns a mapping of ``evidence_type`` -> collector instance, ordered by
+    ``evidence_type`` for determinism.
+
+    Collectors are constructed with the *real* ``storage`` backend. Some
+    collectors (e.g. browser history) wire up a consent manager in
+    ``__init__`` and therefore require a real storage object rather than a
+    placeholder. Construction does not trigger any actual evidence collection;
+    that only happens when :meth:`BaseCollector.collect` is invoked.
+    """
+    collectors: Dict[str, BaseCollector] = {}
+    for evidence_type in sorted(_REGISTRY):
+        collector_cls = _REGISTRY[evidence_type]
+        collectors[evidence_type] = collector_cls(
+            storage, actor, workstation_id, ip_address
+        )
+    return collectors
