@@ -15,7 +15,6 @@
     "build:mac": "npm run build:backend && electron-builder --mac",
     "build:linux": "npm run build:backend && electron-builder --linux",
     "build:backend": "cd .. && python build_backend.py",
-    "postinstall": "electron-builder install-app-deps",
     "audit:check": "npm audit --audit-level=high"
   },
   "dependencies": {
