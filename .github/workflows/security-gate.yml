@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - name: Install UI dependencies
         working-directory: ui
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Node dependency audit (informational)
         continue-on-error: true
         working-directory: ui
