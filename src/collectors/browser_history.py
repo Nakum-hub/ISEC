@@ -12,13 +12,17 @@ import getpass
 import platform
 import socket
 
+from src.collectors.base import BaseCollector, register_collector
 
-class BrowserHistoryCollector:
+
+@register_collector
+class BrowserHistoryCollector(BaseCollector):
+    evidence_type = "browser_history"
+    display_label = "Collecting browser history metadata..."
+    requires_consent = True
+
     def __init__(self, storage, actor, workstation_id, ip_address):
-        self.storage = storage
-        self.actor = actor
-        self.workstation_id = workstation_id
-        self.ip_address = ip_address
+        super().__init__(storage, actor, workstation_id, ip_address)
         
         # Initialize consent manager to check consent status
         from src.utils.consent_manager import get_consent_manager
