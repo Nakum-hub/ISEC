@@ -5,11 +5,22 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from src.core.collector import EvidenceCollector
 from src.utils.digital_signer import get_signer
 from src.utils.role_manager import UserRole
 import verify_export as verify_mod
 from verify_export import verify_export_archive
+
+
+@pytest.fixture(autouse=True)
+def _configure_role_admin_token(monkeypatch):
+    # Assigning the privileged EXPORTER role requires an admin token (V1
+    # role-forgery hardening). Configure one so the export path runs through the
+    # legitimate, authenticated code path instead of being rejected.
+    monkeypatch.setenv("ISEC_ROLE_ADMIN_TOKEN", "test-export-admin-token")
+    yield
 
 
 def _sha256(path):
@@ -28,7 +39,7 @@ def _make_valid_export(tmp_path):
 
     collector = EvidenceCollector(str(output_dir), collect_enabled=False)
     collector.storage.store_evidence("system_logs", {"event": "seed"}, actor="tester")
-    collector.role_manager.set_role(UserRole.EXPORTER, assigned_by="test")
+    assert collector.role_manager.set_role(UserRole.EXPORTER, assigned_by="test") is True
     collector.storage.verify_full_hash_chain(update_results=True)
 
     report_path = output_dir / "report.pdf"
