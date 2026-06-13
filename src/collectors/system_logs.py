@@ -9,13 +9,17 @@ import tempfile
 import shutil
 from datetime import datetime
 
+from src.collectors.base import BaseCollector, register_collector
 
-class SystemLogsCollector:
+
+@register_collector
+class SystemLogsCollector(BaseCollector):
+    evidence_type = "system_logs"
+    display_label = "Collecting system logs..."
+    requires_consent = False
+
     def __init__(self, storage, actor, workstation_id, ip_address):
-        self.storage = storage
-        self.actor = actor
-        self.workstation_id = workstation_id
-        self.ip_address = ip_address
+        super().__init__(storage, actor, workstation_id, ip_address)
         self.powershell_path = self._resolve_powershell()
 
     def _resolve_powershell(self):
