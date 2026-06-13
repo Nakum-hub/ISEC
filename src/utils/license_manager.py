@@ -1,6 +1,15 @@
 """
 License Manager Module
 Verifies offline license files using a public key signature and optional node-locked constraints.
+
+Trust anchor:
+    The embedded PUBLIC_KEY_PEM below is the authoritative license-verification
+    public key. It is a PUBLIC key and is safe to ship in source and in packaged
+    builds. Embedding it ensures license verification still works when the loose
+    keys/license_public_key.pem file is not bundled (e.g. inside a PyInstaller
+    one-file build). For development, ISEC_LICENSE_PUBLIC_KEY /
+    ISEC_LICENSE_PUBLIC_KEY_FILE may override it; in production (ISEC_ENV=production)
+    the env override is ignored.
 """
 import base64
 import hashlib
@@ -16,7 +25,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from src.utils.paths import get_state_dir
 
 PUBLIC_KEY_PEM = """-----BEGIN PUBLIC KEY-----
-REPLACE_WITH_YOUR_PUBLIC_KEY
+MCowBQYDK2VwAyEAlPUmRti8uBg7yPyYD9hzhBEI77TaWUUDa3PGg797Jw4=
 -----END PUBLIC KEY-----"""
 
 
