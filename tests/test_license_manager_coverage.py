@@ -229,7 +229,15 @@ def test_license_manager_ignores_inline_public_key_in_production(monkeypatch, tm
     monkeypatch.setenv("ISEC_ENV", "production")
     monkeypatch.setenv("ISEC_LICENSE_PUBLIC_KEY", "inline-attacker-key")
     monkeypatch.delenv("ISEC_LICENSE_PUBLIC_KEY_FILE", raising=False)
+    # Point the on-disk key search paths at empty directories so the only
+    # remaining trust anchor is the embedded production public key.
+    monkeypatch.setattr(lm, "_project_root", lambda: str(tmp_path / "empty_root"))
+    monkeypatch.setattr(lm, "get_state_dir", lambda: str(tmp_path / "empty_state"))
 
     missing = tmp_path / "missing_license.json"
     manager = LicenseManager(license_file=str(missing))
-    assert manager.public_key_pem is None
+
+    # The attacker-controlled inline env key must never be trusted in production.
+    assert manager.public_key_pem != "inline-attacker-key"
+    # Verification falls back to the embedded, source-controlled trust anchor.
+    assert manager.public_key_pem == lm.PUBLIC_KEY_PEM
