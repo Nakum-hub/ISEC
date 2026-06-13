@@ -137,6 +137,49 @@ class DigitalSigner:
             'payload_hash': payload_hash
         }
 
+    def sign_payload(self, payload):
+        """Sign an arbitrary JSON-serializable payload with the local private key.
+
+        Returns a dict with the hex ``signature``, the SHA-256 ``payload_hash``
+        that was signed, and the ``canonical_payload`` JSON string used to
+        compute it. This is a generic signing primitive used by
+        forensic-soundness features (e.g. the transparency log) that need to
+        sign structured records rather than PDFs.
+        """
+        canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        payload_hash = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+        private_key = self._load_private_key()
+        signature = private_key.sign(
+            payload_hash.encode('utf-8'),
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        return {
+            'signature': signature.hex(),
+            'payload_hash': payload_hash,
+            'canonical_payload': canonical,
+        }
+
+    def verify_payload(self, payload, signature_hex):
+        """Verify a signature produced by :meth:`sign_payload` over a payload."""
+        try:
+            if not signature_hex:
+                return False
+            canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+            payload_hash = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+            public_key = self._load_public_key()
+            public_key.verify(
+                bytes.fromhex(signature_hex),
+                payload_hash.encode('utf-8'),
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+            return True
+        except InvalidSignature:
+            return False
+        except Exception:
+            return False
+
     def sign_pdf(self, report_path, signature_data):
         """
         Create an external signature file for a PDF report.
