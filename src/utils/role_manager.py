@@ -1,12 +1,28 @@
 """
 Role Manager Module
 Implements role-based access control for the ISEC application
+
+Security note (V1 hardening):
+    The encrypted role file is encrypted with a key derived from PUBLIC system
+    information (username, hostname, platform). That provides confidentiality of
+    convenience only -- it does NOT provide authenticity, because anyone who
+    knows the username/hostname can reproduce the key and forge a role file that
+    grants themselves a privileged role (privilege escalation).
+
+    To close that hole, any role above the safe default (REVIEWER) must now be
+    authenticated with an HMAC-SHA256 tag computed over the role payload using
+    the role admin token as the key -- the same secret already required to
+    authorize a role change. On load, a privileged role is only honored if its
+    HMAC verifies against the configured admin token. Unsigned, tampered, or
+    unverifiable privileged roles are rejected and the user falls back to the
+    least-privileged REVIEWER role.
 """
 import json
 import os
 import getpass
 import platform
 import base64
+import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -21,6 +37,11 @@ class UserRole(Enum):
     COLLECTOR = "collector"
     REVIEWER = "reviewer"
     EXPORTER = "exporter"
+
+
+# Roles that carry privileges beyond the safe read-only default. Persisting or
+# loading any of these requires an authentic HMAC signature (see module docstring).
+PRIVILEGED_ROLES = frozenset({UserRole.COLLECTOR, UserRole.EXPORTER})
 
 
 class RoleManager:
@@ -49,7 +70,13 @@ class RoleManager:
             self.set_role(self.current_role)
     
     def _derive_key_from_system_info(self):
-        """Derive encryption key from system-specific information"""
+        """Derive encryption key from system-specific information.
+
+        NOTE: This key is for confidentiality-at-rest convenience only. It is
+        derived from public system info and therefore must NOT be relied on for
+        authenticity. Authenticity of privileged roles is enforced separately via
+        an HMAC tag keyed by the role admin token (see _sign_role_payload).
+        """
         # Create a password based on system information
         system_info = f"{self.user}@{self.host}-{platform.system()}-{platform.machine()}"
         password = system_info.encode()
@@ -85,6 +112,60 @@ class RoleManager:
                 return None, "invalid_file"
 
         return None, "missing"
+
+    def _role_signing_secret(self):
+        """Return the secret (bytes) used to HMAC-authenticate role state, or None."""
+        token, _ = self._get_role_admin_token()
+        if not token:
+            return None
+        return token.encode("utf-8")
+
+    def _canonical_role_payload(self, role_data):
+        """Deterministic byte serialization of the authenticated role fields.
+
+        The signature field itself is intentionally excluded so signing and
+        verification operate over identical bytes.
+        """
+        payload = {
+            key: role_data.get(key)
+            for key in ("user", "host", "role", "assigned_at", "assigned_by")
+            if key in role_data
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+    def _sign_role_payload(self, role_data):
+        """Compute an HMAC-SHA256 tag over the role payload, or None if no secret."""
+        secret = self._role_signing_secret()
+        if not secret:
+            return None
+        return hmac.new(secret, self._canonical_role_payload(role_data), hashlib.sha256).hexdigest()
+
+    def _verify_role_payload(self, role_data, signature):
+        """Constant-time verification of a role payload's HMAC tag."""
+        if not signature or not isinstance(signature, str):
+            return False
+        secret = self._role_signing_secret()
+        if not secret:
+            return False
+        expected = hmac.new(secret, self._canonical_role_payload(role_data), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature)
+
+    def _audit_role_integrity_failure(self, reason, role_value):
+        """Best-effort audit record when a stored role fails integrity checks."""
+        try:
+            self.storage.store_evidence(
+                evidence_type="role_integrity_failure",
+                data={
+                    "reason": reason,
+                    "rejected_role": role_value,
+                    "user": self.user,
+                    "host": self.host,
+                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                },
+                actor=self.user
+            )
+        except Exception:
+            pass
 
     def _parse_datetime(self, value):
         if not value:
@@ -264,6 +345,16 @@ class RoleManager:
             'assigned_at': datetime.now().isoformat(),
             'assigned_by': assigned_by
         }
+
+        # Authenticate the role payload so it cannot be forged offline. A
+        # privileged role with no signing secret available cannot be persisted
+        # authentically and must not be written.
+        signature = self._sign_role_payload(role_data)
+        if signature:
+            role_data['signature'] = signature
+        elif role in PRIVILEGED_ROLES:
+            print("Error setting role: cannot persist a privileged role without an admin token configured.")
+            return False
         
         try:
             # Encrypt the role data
@@ -300,7 +391,13 @@ class RoleManager:
             return False
     
     def _load_user_role(self):
-        """Load the current user's role from encrypted storage"""
+        """Load the current user's role from encrypted storage.
+
+        Privileged roles are only honored when accompanied by a valid HMAC tag
+        keyed by the configured admin token. Any privileged role that is
+        unsigned, tampered, or unverifiable is rejected (return None) so the
+        caller falls back to the least-privileged REVIEWER role.
+        """
         try:
             target_file = None
             if os.path.exists(self.encrypted_role_file):
@@ -323,10 +420,24 @@ class RoleManager:
             role_data = json.loads(decrypted_data.decode())
             
             # Verify this role belongs to current user and host
-            if role_data.get('user') == self.user and role_data.get('host') == self.host:
-                return UserRole(role_data.get('role'))
-            else:
+            if not (role_data.get('user') == self.user and role_data.get('host') == self.host):
                 return None
+
+            loaded_role = UserRole(role_data.get('role'))
+
+            # The safe default role grants no privileges, so it never needs a
+            # signature and can always be honored.
+            if loaded_role not in PRIVILEGED_ROLES:
+                return loaded_role
+
+            # Privileged roles must be authenticated. Reject anything we cannot
+            # cryptographically verify and deny the escalation.
+            if self._verify_role_payload(role_data, role_data.get('signature')):
+                return loaded_role
+
+            print("Warning: stored role failed integrity verification; defaulting to REVIEWER.")
+            self._audit_role_integrity_failure("hmac_verification_failed", role_data.get('role'))
+            return None
                 
         except Exception as e:
             print(f"Error loading role: {e}")
