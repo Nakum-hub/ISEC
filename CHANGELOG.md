@@ -23,8 +23,6 @@ All notable changes to ISEC are documented in this file.
 - Regression suite `tests/test_role_forgery.py` proving forged/unsigned/wrong-token
   privileged roles cannot escalate and that tampering raises an audit event.
 - `docs/THREAT_MODEL.md` — STRIDE-based threat model and chain-of-custody guarantees.
-- `docs/PRODUCT_ONEPAGER.md` — positioning, target buyers, and pricing tiers.
-- `docs/PILOT_AND_LICENSING.md` — pilot playbook and licensing/EULA outline.
 
 ### Changed
 
