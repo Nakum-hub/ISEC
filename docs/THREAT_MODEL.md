@@ -74,8 +74,9 @@ ISEC asserts, for any evidence package it exports:
 
 ISEC does **not** assert that the operator collected the right artifacts, that the
 artifacts were not altered *before* collection, or that collection was legal in
-the operator's jurisdiction. Those are operational/legal controls (see
-`docs/PILOT_AND_LICENSING.md`).
+the operator's jurisdiction. Those are operational and legal controls that sit
+with the operator and their organization (authorization to collect, scope,
+handling, and jurisdictional compliance).
 
 ## 7. Out of scope
 
@@ -91,3 +92,22 @@ the operator's jurisdiction. Those are operational/legal controls (see
 - Add RFC 3161 trusted timestamps to the chain head so ordering is anchored to a
   trusted time source, not just local wall-clock.
 - Counter-sign the chain head at export with an organization key held off-device.
+
+## 9. Control ↔ adversary coverage matrix
+
+This matrix maps each adversary to the controls that address it, and honestly
+separates what ships **today** from **roadmap** hardening so reviewers are never
+misled about current assurance.
+
+Legend: ✅ implemented today · 🛠️ planned (see the product value roadmap).
+
+| Adversary | Controls in place today (✅) | Roadmap hardening (🛠️) |
+|---|---|---|
+| **A1 — Local tamperer** | SHA-256 hash chain + per-record HMAC ✅; startup chain verification that locks collection on a break ✅ | Off-device key custody (OS keystore / HSM) 🛠️; RFC 3161 timestamp on the chain head 🛠️; transparency-log counter-sign of the chain head 🛠️ |
+| **A2 — Privilege escalator** | HMAC-signed role state keyed by admin token ✅; admin-token gate with bounded lockout + backoff ✅; append-only auth/integrity audit events ✅ | Off-device WORM audit sink 🛠️ |
+| **A3 — License pirate** | Ed25519 license signature + machine-fingerprint binding ✅; production ignores env public-key override ✅ | Optional online entitlement check 🛠️ |
+| **A4 — Export forger** | RSA-2048 signed export sidecar ✅; independent verifier CLI that fails closed with an explicit reason ✅ | Provable time via TSA token on each export 🛠️; counter-signed chain head 🛠️; CASE/UCO export + embedded verification instructions 🛠️ |
+| **A5 — Supply-chain attacker** | Pinned dependencies + Dependabot monitoring ✅; pip-audit / npm-audit / CodeQL in CI ✅ | SBOM (CycloneDX) 🛠️; SLSA build provenance attestation 🛠️; published release checksums 🛠️ |
+
+Any control marked 🛠️ is **not** an assurance ISEC makes today and must not be
+represented as such until it is implemented and verified on a real machine.
