@@ -9,13 +9,17 @@ import os
 import shutil
 from datetime import datetime
 
+from src.collectors.base import BaseCollector, register_collector
 
-class NetworkConnectionsCollector:
+
+@register_collector
+class NetworkConnectionsCollector(BaseCollector):
+    evidence_type = "network_connections"
+    display_label = "Collecting network connections..."
+    requires_consent = False
+
     def __init__(self, storage, actor, workstation_id, ip_address):
-        self.storage = storage
-        self.actor = actor
-        self.workstation_id = workstation_id
-        self.ip_address = ip_address
+        super().__init__(storage, actor, workstation_id, ip_address)
         self.windows_netstat = self._resolve_windows_netstat()
         self.unix_netstat = self._resolve_unix_command("netstat")
         self.unix_ss = self._resolve_unix_command("ss")
