@@ -10,10 +10,10 @@ import tempfile
 import json
 from datetime import datetime
 from src.storage.database import EvidenceDatabase
-from src.collectors.system_logs import SystemLogsCollector
-from src.collectors.browser_history import BrowserHistoryCollector
-from src.collectors.network_connections import NetworkConnectionsCollector
-from src.collectors.file_metadata import FileMetadataCollector
+# Importing the collectors package registers every built-in collector with the
+# plugin registry and exposes build_collectors(), so collectors are discovered
+# dynamically rather than hard-wired here.
+from src.collectors import build_collectors
 from src.utils.consent_manager import get_consent_manager, ConsentStatus
 from src.utils.role_manager import get_role_manager, UserRole
 from src.utils.retention_engine import get_retention_engine, RetentionPolicy
@@ -24,6 +24,24 @@ import socket
 
 
 class EvidenceCollector:
+    # Console status strings preserved verbatim from the original hard-wired
+    # orchestrator so that user-facing output is unchanged after the rewire.
+    _COLLECT_STATUS_MESSAGES = {
+        'system_logs': "Collecting system logs...",
+        'browser_history': "Checking browser data collection consent...",
+        'network_connections': "Collecting network connections...",
+        'file_metadata': "Collecting file metadata...",
+    }
+    # Canonical collection order for the built-in collectors. This order feeds
+    # the integrity-sensitive hash chain, so it is preserved exactly. Any
+    # additional registered collectors run afterwards in registry order.
+    _DEFAULT_COLLECT_ORDER = (
+        'system_logs',
+        'browser_history',
+        'network_connections',
+        'file_metadata',
+    )
+
     def __init__(self, output_dir, update_chain_results=True, collect_enabled=True):
         self.output_dir = output_dir
         self.collect_enabled = bool(collect_enabled)
@@ -58,24 +76,28 @@ class EvidenceCollector:
         self.browser_consent_status = self.consent_manager.check_consent_status('browser_data')
         self.browser_consent_granted = self.browser_consent_status['status'] == ConsentStatus.GRANTED.value
         
-        # Initialize collectors only when collection is licensed and role permits it.
+        # Initialize collectors only when collection is licensed and role permits
+        # it. Collectors are discovered through the plugin registry (see
+        # src/collectors/base.py) and instantiated uniformly via
+        # build_collectors(), so adding a new collector requires only writing
+        # its module -- no edits here. Consent-gated collectors (e.g. browser
+        # history) are always instantiated; they enforce consent internally at
+        # collect() time, matching the previous behaviour.
         if self.collect_enabled and self.role_manager.has_permission('collect'):
-            self.system_logs_collector = SystemLogsCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
-            self.network_connections_collector = NetworkConnectionsCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
-            self.file_metadata_collector = FileMetadataCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
-            
-            # Only initialize browser collector if consent is granted
-            if self.browser_consent_granted:
-                self.browser_history_collector = BrowserHistoryCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
-            else:
-                # Create a browser collector that will enforce consent
-                self.browser_history_collector = BrowserHistoryCollector(self.storage, self.actor, self.workstation_id, self.ip_address)
+            self.collectors = build_collectors(
+                self.storage, self.actor, self.workstation_id, self.ip_address
+            )
         else:
             # Role doesn't have collection permissions
-            self.system_logs_collector = None
-            self.network_connections_collector = None
-            self.file_metadata_collector = None
-            self.browser_history_collector = None
+            self.collectors = {}
+
+        # Backward-compatible named handles for collectors referenced directly
+        # by other modules (e.g. main.py uses browser_history_collector for the
+        # consent UI). These are None when collection is not permitted.
+        self.system_logs_collector = self.collectors.get('system_logs')
+        self.browser_history_collector = self.collectors.get('browser_history')
+        self.network_connections_collector = self.collectors.get('network_connections')
+        self.file_metadata_collector = self.collectors.get('file_metadata')
         
         # Flag to indicate if evidence collection should proceed
         self.collection_allowed = self.collect_enabled and not self.tampering_detected and self.role_manager.has_permission('collect')
@@ -97,7 +119,30 @@ class EvidenceCollector:
         except Exception:
             pass
         return "unknown"
-    
+
+    def _ordered_evidence_types(self):
+        """Return evidence types in canonical collection order.
+
+        The built-in collectors keep their original, integrity-sensitive order;
+        any additional registered collectors are appended in registry order so
+        new plugins are picked up automatically.
+        """
+        ordered = list(self._DEFAULT_COLLECT_ORDER)
+        for evidence_type in self.collectors:
+            if evidence_type not in ordered:
+                ordered.append(evidence_type)
+        return ordered
+
+    def _status_message_for(self, evidence_type):
+        """Console status string shown before running a collector."""
+        message = self._COLLECT_STATUS_MESSAGES.get(evidence_type)
+        if message:
+            return message
+        collector = self.collectors.get(evidence_type)
+        if collector is not None:
+            return collector.label()
+        return evidence_type
+
     def collect_all_evidence(self):
         """Collect all types of evidence with consent enforcement and role-based access control"""
         if not self.collect_enabled:
@@ -112,22 +157,13 @@ class EvidenceCollector:
             print(f"Access denied: Role '{self.current_role['name']}' does not have permission to collect evidence.")
             return
         
-        print("Collecting system logs...")
-        if self.system_logs_collector:
-            self.system_logs_collector.collect()
-        
-        print("Checking browser data collection consent...")
-        # The browser collector handles consent internally
-        if self.browser_history_collector:
-            self.browser_history_collector.collect()
-        
-        print("Collecting network connections...")
-        if self.network_connections_collector:
-            self.network_connections_collector.collect()
-        
-        print("Collecting file metadata...")
-        if self.file_metadata_collector:
-            self.file_metadata_collector.collect()
+        # Collect in canonical order. Status strings are preserved verbatim; the
+        # browser collector handles consent internally.
+        for evidence_type in self._ordered_evidence_types():
+            print(self._status_message_for(evidence_type))
+            collector = self.collectors.get(evidence_type)
+            if collector:
+                collector.collect()
         
         # Verify hash chain after collection
         chain_valid = self.storage.verify_full_hash_chain()
@@ -154,30 +190,16 @@ class EvidenceCollector:
             print(f"Access denied: Role '{self.current_role['name']}' does not have permission to collect evidence.")
             return
 
-        type_map = {
-            'system_logs': self.system_logs_collector,
-            'browser_history': self.browser_history_collector,
-            'network_connections': self.network_connections_collector,
-            'file_metadata': self.file_metadata_collector
-        }
-
-        selected = [t for t in (evidence_types or []) if t in type_map]
+        selected = [t for t in (evidence_types or []) if t in self.collectors]
         if not selected:
             print("No valid evidence types selected. Skipping collection.")
             return
 
         for evidence_type in selected:
-            collector = type_map.get(evidence_type)
+            collector = self.collectors.get(evidence_type)
             if not collector:
                 continue
-            if evidence_type == 'system_logs':
-                print("Collecting system logs...")
-            elif evidence_type == 'browser_history':
-                print("Checking browser data collection consent...")
-            elif evidence_type == 'network_connections':
-                print("Collecting network connections...")
-            elif evidence_type == 'file_metadata':
-                print("Collecting file metadata...")
+            print(self._status_message_for(evidence_type))
             collector.collect()
 
         chain_valid = self.storage.verify_full_hash_chain()
