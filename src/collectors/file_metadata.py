@@ -8,14 +8,15 @@ import platform
 import tempfile
 from datetime import datetime
 
+from src.collectors.base import BaseCollector, register_collector
 
-class FileMetadataCollector:
-    def __init__(self, storage, actor, workstation_id, ip_address):
-        self.storage = storage
-        self.actor = actor
-        self.workstation_id = workstation_id
-        self.ip_address = ip_address
-    
+
+@register_collector
+class FileMetadataCollector(BaseCollector):
+    evidence_type = "file_metadata"
+    display_label = "Collecting file metadata..."
+    requires_consent = False
+
     def collect(self):
         """Collect file metadata from common system directories"""
         print("Collecting file metadata...")
