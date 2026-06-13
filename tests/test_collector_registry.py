@@ -2,16 +2,20 @@
 Tests for the collector plugin framework (src/collectors/base.py).
 
 Verifies that the BaseCollector interface and registry work end-to-end and
-that all migrated collectors register and conform to the interface. These
-tests deliberately avoid instantiating collectors with fake storage --
+that all migrated collectors register and conform to the interface.
+
+Most tests deliberately avoid instantiating collectors with fake storage --
 BrowserHistoryCollector, for example, wires up a consent manager in __init__
 and needs real storage. Only FileMetadataCollector (whose __init__ has no
-side effects) is instantiated here. collect() is never invoked.
+side effects) is instantiated with placeholders. The build_collectors test
+uses a real on-disk EvidenceDatabase so every collector -- including the
+consent-gated ones -- can be constructed. collect() is never invoked.
 """
 import pytest
 
 from src.collectors.base import (
     BaseCollector,
+    build_collectors,
     register_collector,
     get_collector_class,
     registered_evidence_types,
@@ -79,6 +83,32 @@ def test_shared_constructor_sets_context():
     assert inst.workstation_id == "ws-1"
     assert inst.ip_address == "10.0.0.1"
     assert hasattr(inst, "collect")
+
+
+def test_build_collectors_instantiates_all_with_real_storage(tmp_path):
+    # build_collectors() backs the orchestrator: it constructs every registered
+    # collector with the shared (storage, actor, workstation_id, ip_address)
+    # signature. A real storage backend is required because consent-gated
+    # collectors (browser history) wire up a consent manager in __init__.
+    from src.storage.database import EvidenceDatabase
+
+    storage = EvidenceDatabase(str(tmp_path / "evidence.db"))
+    collectors = build_collectors(storage, "actor", "ws-1", "10.0.0.1")
+
+    # Every registered collector is present and built once.
+    assert set(collectors) == set(registered_evidence_types())
+    assert set(collectors) >= set(ALL_COLLECTORS)
+
+    for evidence_type, (expected_cls, _, _) in ALL_COLLECTORS.items():
+        instance = collectors[evidence_type]
+        assert isinstance(instance, expected_cls)
+        assert isinstance(instance, BaseCollector)
+        assert instance.evidence_type == evidence_type
+        assert instance.storage is storage
+        assert instance.actor == "actor"
+        assert instance.workstation_id == "ws-1"
+        assert instance.ip_address == "10.0.0.1"
+        assert hasattr(instance, "collect")
 
 
 def test_registry_rejects_non_basecollector():
