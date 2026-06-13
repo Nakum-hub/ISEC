@@ -97,17 +97,3 @@ def iter_collector_classes() -> Iterator[Type[BaseCollector]]:
     """Iterate registered collector classes in stable (sorted) order."""
     for evidence_type in sorted(_REGISTRY):
         yield _REGISTRY[evidence_type]
-
-
-def build_collectors(storage, actor, workstation_id, ip_address) -> Dict[str, BaseCollector]:
-    """Instantiate every registered collector.
-
-    Returns a mapping of ``{evidence_type: collector_instance}`` built in
-    stable order using the shared constructor signature.
-    """
-    return {
-        evidence_type: _REGISTRY[evidence_type](
-            storage, actor, workstation_id, ip_address
-        )
-        for evidence_type in sorted(_REGISTRY)
-    }
