@@ -33,6 +33,8 @@ ACTION_FEATURE_REQUIREMENTS = {
     'collect': {'collect'},
     'report': {'view', 'report'},
     'export': {'view', 'export'},
+    'export_case': {'view', 'export'},
+    'transparency_status': {'view'},
 }
 
 
@@ -466,7 +468,7 @@ def main():
     parser.add_argument('--assign-role', action='store_true', help='Assign user role interactively')
     parser.add_argument('--set-retention', action='store_true', help='Set evidence retention policy interactively')
     parser.add_argument('--electron-mode', action='store_true', help='Run in non-interactive mode for Electron UI')
-    parser.add_argument('--action', choices=['run', 'status', 'timeline', 'collect', 'report', 'export', 'detail', 'set_browser_consent', 'set_role'], default='run', help='Internal action for Electron IPC')
+    parser.add_argument('--action', choices=['run', 'status', 'timeline', 'collect', 'report', 'export', 'detail', 'set_browser_consent', 'set_role', 'export_case', 'transparency_status'], default='run', help='Internal action for Electron IPC')
     parser.add_argument('--consent-time-range', choices=['last_24h', 'last_7d', 'last_30d', 'all_time'], help='Time range for browser history consent (Electron action)')
     parser.add_argument('--consent-browsers', help='Comma-separated list of browsers to scan (Electron action)')
     parser.add_argument('--collect-types', help='Comma-separated evidence types to collect (system_logs,browser_history,network_connections,file_metadata)')
@@ -474,6 +476,11 @@ def main():
     parser.add_argument('--role-auth-token', help='Admin token required for set_role action')
     parser.add_argument('--record-id', type=int, help='Evidence record ID for detail action')
     parser.add_argument('--state-dir', help='Directory for local state (roles, consents, keys)')
+    parser.add_argument('--case-output', help='Output path for the CASE/UCO bundle (export_case action)')
+    parser.add_argument('--case-include-payload', action='store_true', help='Embed decrypted evidence payloads in the CASE/UCO export')
+    parser.add_argument('--case-include-expired', action='store_true', help='Include expired records in the CASE/UCO export')
+    parser.add_argument('--case-include-deleted', action='store_true', help='Include deleted records in the CASE/UCO export')
+    parser.add_argument('--ledger-file', help='Path to the transparency log ledger (transparency_status action)')
     
     args = parser.parse_args()
 
@@ -861,6 +868,80 @@ def main():
             emit_json({"success": True, "filePath": zip_path, "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))})
         else:
             emit_json({"success": False, "message": "Export failed.", "filePath": None, "status": status_payload})
+        return
+    if args.action == 'export_case':
+        status_payload = build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
+        if not license_allows('export'):
+            emit_json({"success": False, "message": "CASE/UCO export blocked: valid license required.", "filePath": None, "status": status_payload})
+            return
+        if collector.tampering_detected:
+            emit_json({"success": False, "message": "CASE/UCO export blocked due to tampering detection.", "filePath": None, "status": status_payload})
+            return
+        if not collector.role_manager.has_permission('export'):
+            emit_json({"success": False, "message": "CASE/UCO export blocked: exporter role required.", "filePath": None, "status": status_payload})
+            return
+        if not status_payload.get('hashChainValid', True):
+            emit_json({"success": False, "message": "CASE/UCO export blocked: integrity verification failed.", "filePath": None, "status": status_payload})
+            return
+        if status_payload.get('evidenceItemsCount', 0) <= 0:
+            emit_json({"success": False, "message": "CASE/UCO export blocked: no evidence available.", "filePath": None, "status": status_payload})
+            return
+        case_output = args.case_output
+        if not case_output:
+            base_dir = args.export_dir or collector.output_dir
+            case_output = os.path.join(base_dir, 'evidence.case.json')
+        try:
+            from src.forensics.case_export import export_case_bundle
+            output_path = export_case_bundle(
+                collector.storage,
+                case_output,
+                include_payload=args.case_include_payload,
+                include_expired=args.case_include_expired,
+                include_deleted=args.case_include_deleted,
+            )
+        except Exception as exc:
+            emit_json({"success": False, "message": f"CASE/UCO export failed: {exc}", "filePath": None, "status": status_payload})
+            return
+        emit_json({"success": True, "filePath": output_path, "status": build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))})
+        return
+    if args.action == 'transparency_status':
+        status_payload = build_status_payload(collector, license_status=license_status, license_allowed_collect=license_allows('collect'))
+        if not license_allows('view'):
+            emit_json({"success": False, "message": "Transparency log status blocked: valid license required.", "transparency": None, "status": status_payload})
+            return
+        if not collector.role_manager.has_permission('view'):
+            emit_json({"success": False, "message": "Transparency log status blocked: insufficient permissions.", "transparency": None, "status": status_payload})
+            return
+        ledger_path = args.ledger_file or os.path.join(collector.output_dir, 'transparency_log.jsonl')
+        if not os.path.exists(ledger_path):
+            emit_json({"success": True, "message": "No transparency log present.", "transparency": {"present": False, "ledgerPath": ledger_path}, "status": status_payload})
+            return
+        signer = None
+        try:
+            from src.forensics.transparency_log import TransparencyLog
+            try:
+                from src.utils.digital_signer import get_signer
+                signer = get_signer()
+            except Exception:
+                signer = None
+            ledger = TransparencyLog(ledger_path, signer=signer)
+            result = ledger.verify()
+        except Exception as exc:
+            emit_json({"success": False, "message": f"Transparency log verification failed: {exc}", "transparency": None, "status": status_payload})
+            return
+        emit_json({
+            "success": True,
+            "transparency": {
+                "present": True,
+                "ledgerPath": ledger_path,
+                "schema": result.get("schema"),
+                "valid": result.get("valid"),
+                "entries": result.get("entries"),
+                "signatureVerification": bool(signer is not None),
+                "issues": result.get("issues", [])
+            },
+            "status": status_payload
+        })
         return
     
     # Handle role assignment if requested
