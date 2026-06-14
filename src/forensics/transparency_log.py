@@ -14,7 +14,8 @@ evidence chain over time. Each checkpoint captures:
   * a monotonically increasing sequence number,
   * the evidence chain tip hash and record count at checkpoint time,
   * an optional hash of the evidence database file,
-  * the hash of the previous ledger entry (linking the ledger itself), and
+  * the hash of the previous ledger entry (linking the ledger itself),
+  * an optional RFC 3161 trusted-timestamp token, and
   * an optional digital signature over the entry.
 
 Because record counts must never decrease, the ledger is hash-linked, and
@@ -24,7 +25,8 @@ substitution of the evidence database by replaying and verifying the ledger.
 This module is dependency-free (standard library plus the existing
 DigitalSigner) and is intended to be feature-flagged off by default at the
 orchestrator level; constructing or using a TransparencyLog on its own has no
-effect on evidence collection.
+effect on evidence collection. Trusted timestamping is performed by an
+injected callable so this module never performs network I/O itself.
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ import hashlib
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 LEDGER_SCHEMA = "ISEC_TRANSPARENCY_LOG_v1"
@@ -99,12 +101,18 @@ class TransparencyLog:
         record_count: int,
         db_hash: Optional[str] = None,
         extra: Optional[Dict[str, Any]] = None,
+        timestamp_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Append a new checkpoint to the ledger and return the written record.
 
         Raises ``ValueError`` if ``record_count`` is negative or if it is lower
         than the previous checkpoint's count (a rollback the ledger refuses to
         record, since checkpoints must be monotonically non-decreasing).
+
+        ``timestamp_token`` is an optional, opaque RFC 3161 token (base64). When
+        provided it is included in the signed/hashed entry core so the trusted
+        timestamp is tamper-evident; when omitted the entry core is identical to
+        a checkpoint written without timestamping.
         """
         if record_count is None or int(record_count) < 0:
             raise ValueError("record_count must be a non-negative integer")
@@ -133,6 +141,10 @@ class TransparencyLog:
             "prev_entry_hash": prev_entry_hash,
             "extra": extra or {},
         }
+        # Only add the key when a token exists, so checkpoints written without
+        # timestamping hash identically to before this feature was introduced.
+        if timestamp_token is not None:
+            entry_core["timestamp_token"] = timestamp_token
         entry_hash = _entry_hash(entry_core)
 
         record: Dict[str, Any] = {"entry": entry_core, "entry_hash": entry_hash}
@@ -212,12 +224,19 @@ def checkpoint_from_database(
     transparency_log: TransparencyLog,
     storage: Any,
     extra: Optional[Dict[str, Any]] = None,
+    timestamper: Optional[Callable[[Optional[str]], Optional[str]]] = None,
 ) -> Dict[str, Any]:
     """Append a checkpoint derived from an EvidenceDatabase-like ``storage``.
 
     Reads the current chain tip hash and total record count from ``storage``
     and appends a signed checkpoint, including a hash of the database file when
     available. Returns the appended ledger record.
+
+    ``timestamper`` is an optional callable ``(tip_hash) -> token`` (for
+    example one produced by :func:`src.forensics.rfc3161.make_timestamper`).
+    When supplied, a trusted RFC 3161 timestamp token is fetched best-effort
+    and embedded in the checkpoint; any failure is swallowed so collection is
+    never disrupted.
     """
     # Refresh the cached chain tip without rewriting verification results.
     try:
@@ -238,9 +257,17 @@ def checkpoint_from_database(
     if db_path and os.path.exists(db_path):
         db_hash = _file_sha256(db_path)
 
+    timestamp_token = None
+    if timestamper is not None:
+        try:
+            timestamp_token = timestamper(tip_hash)
+        except Exception:
+            timestamp_token = None
+
     return transparency_log.append_checkpoint(
         tip_hash=tip_hash,
         record_count=record_count,
         db_hash=db_hash,
         extra=extra,
+        timestamp_token=timestamp_token,
     )
