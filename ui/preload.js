@@ -38,6 +38,10 @@ const ALLOWED_INVOKE = new Set([
   'export-evidence',
   'get-reports-list',
 
+  // Evidence interoperability & transparency
+  'export-case',
+  'get-transparency-status',
+
   // Audit log
   'get-audit-log',
 
