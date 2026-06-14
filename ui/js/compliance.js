@@ -66,6 +66,10 @@
   async function initCompliance() {
     document.getElementById('compliance-refresh-btn') && document.getElementById('compliance-refresh-btn').addEventListener('click', loadCompliance);
     document.getElementById('compliance-export-btn') && document.getElementById('compliance-export-btn').addEventListener('click', exportMatrix);
+    const tvBtn = document.getElementById('transparency-verify-btn');
+    if (tvBtn) tvBtn.addEventListener('click', verifyTransparencyLog);
+    const ceBtn = document.getElementById('case-export-btn');
+    if (ceBtn) ceBtn.addEventListener('click', exportCaseBundle);
     await loadCompliance();
   }
 
@@ -198,6 +202,83 @@
     a.href=url; a.download=`isec-compliance-matrix-${Date.now()}.csv`;
     a.click(); URL.revokeObjectURL(url);
     ISECNotify && ISECNotify.success('Compliance matrix exported');
+  }
+
+  // ── Evidence integrity & interoperability helpers ───────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+
+  async function verifyTransparencyLog() {
+    const bridge = window.isec;
+    const out = document.getElementById('transparency-result');
+    const btn = document.getElementById('transparency-verify-btn');
+    if (!bridge) { if (out) out.textContent = 'Secure bridge unavailable.'; return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+    if (out) out.innerHTML = '<span style="color:var(--text-muted);">Verifying transparency log…</span>';
+    try {
+      const res = await bridge.invoke('get-transparency-status');
+      if (!res || res.success === false) {
+        const msg = (res && res.message) ? res.message : 'Verification failed.';
+        if (out) out.innerHTML = `<span style="color:var(--danger);">\u2717 ${esc(msg)}</span>`;
+        ISECNotify && ISECNotify.error(msg);
+        return;
+      }
+      const t = res.transparency || {};
+      if (!t.present) {
+        if (out) out.innerHTML = '<span style="color:var(--warning);">No transparency log present yet.</span>';
+        ISECNotify && ISECNotify.info('No transparency log present.');
+        return;
+      }
+      const ok = !!t.valid;
+      const color = ok ? 'var(--success)' : 'var(--danger)';
+      const icon = ok ? '\u2713' : '\u2717';
+      const issues = Array.isArray(t.issues) ? t.issues : [];
+      let html = `<div style="color:${color};font-weight:600;margin-bottom:4px;">${icon} ${ok ? 'Log verified' : 'Verification failed'}</div>`;
+      html += `<div>Entries: ${esc(t.entries != null ? t.entries : 0)} \u00b7 Schema: ${esc(t.schema || '\u2014')}</div>`;
+      html += `<div>Signature: ${t.signatureVerification ? '<span style="color:var(--success);">verified</span>' : '<span style="color:var(--text-muted);">not verified</span>'}</div>`;
+      if (issues.length) {
+        html += '<div style="margin-top:5px;color:var(--warning);">Issues:</div>';
+        html += issues.map(i => `<div style="color:var(--warning);">\u2022 ${esc(i)}</div>`).join('');
+      }
+      if (out) out.innerHTML = html;
+      ISECNotify && (ok ? ISECNotify.success('Transparency log verified') : ISECNotify.warning('Transparency log verification failed'));
+    } catch (err) {
+      if (out) out.innerHTML = `<span style="color:var(--danger);">\u2717 ${esc(err.message || 'Verification error')}</span>`;
+      ISECNotify && ISECNotify.error(err.message || 'Verification error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify Log'; }
+    }
+  }
+
+  async function exportCaseBundle() {
+    const bridge = window.isec;
+    const out = document.getElementById('case-export-result');
+    const btn = document.getElementById('case-export-btn');
+    if (!bridge) { if (out) out.textContent = 'Secure bridge unavailable.'; return; }
+    const opts = {
+      includePayload: !!(document.getElementById('case-include-payload') && document.getElementById('case-include-payload').checked),
+      includeExpired: !!(document.getElementById('case-include-expired') && document.getElementById('case-include-expired').checked),
+      includeDeleted: !!(document.getElementById('case-include-deleted') && document.getElementById('case-include-deleted').checked),
+    };
+    if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+    if (out) out.innerHTML = '<span style="color:var(--text-muted);">Exporting CASE/UCO bundle…</span>';
+    try {
+      const res = await bridge.invoke('export-case', opts);
+      if (res && res.success) {
+        if (out) out.innerHTML = `<span style="color:var(--success);">\u2713 Exported</span><div style="color:var(--text-muted);margin-top:3px;word-break:break-all;">${esc(res.filePath || '')}</div>`;
+        ISECNotify && ISECNotify.success(res.message || 'CASE/UCO bundle exported');
+      } else {
+        const msg = (res && res.message) ? res.message : 'Export failed.';
+        if (out) out.innerHTML = `<span style="color:var(--danger);">\u2717 ${esc(msg)}</span>`;
+        ISECNotify && ISECNotify.error(msg);
+      }
+    } catch (err) {
+      if (out) out.innerHTML = `<span style="color:var(--danger);">\u2717 ${esc(err.message || 'Export error')}</span>`;
+      ISECNotify && ISECNotify.error(err.message || 'Export error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Export Bundle'; }
+    }
   }
 
   window.initCompliance = initCompliance;
