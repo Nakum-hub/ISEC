@@ -6,7 +6,7 @@ import os
 import sqlite3
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, LongTable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -50,6 +50,25 @@ class ReportGenerator:
             'total_evidence': total_count,
             'by_type': dict(evidence_counts)
         }
+
+    def _get_chain_of_custody_rows(self):
+        """Return every evidence record in chain (id ascending) order.
+
+        Columns: id, evidence_type, timestamp, actor, workstation_id,
+        ip_address, current_record_hash, retention_status. Reading the chain in
+        insertion order is what makes the chain-of-custody table forensically
+        meaningful (it mirrors the hash-chain link order).
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, evidence_type, timestamp, actor, workstation_id, ip_address, "
+            "current_record_hash, COALESCE(retention_status, 'active') "
+            "FROM evidence ORDER BY id ASC"
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
     
     def _get_system_info(self):
         """Get system information for the report"""
@@ -95,6 +114,118 @@ class ReportGenerator:
         """Get hash chain verification result"""
         # We'll call the storage method to get the verification result
         return self.storage.get_hash_chain_verification_result()
+
+    def _append_chain_of_custody(self, story, styles):
+        """Append a per-record chain-of-custody table to the report story.
+
+        Each row reports the record's identity, custody metadata, and live HMAC
+        integrity check, paginated across pages with a repeating header. Safe
+        on an empty database.
+        """
+        rows = self._get_chain_of_custody_rows()
+        story.append(Paragraph("Chain of Custody", styles['Heading2']))
+
+        if not rows:
+            story.append(Paragraph("No evidence records present.", styles['Normal']))
+            story.append(Spacer(1, 20))
+            return
+
+        cell_style = ParagraphStyle('COCCell', parent=styles['Normal'], fontSize=7, leading=9)
+        header_style = ParagraphStyle(
+            'COCHeader', parent=styles['Normal'], fontSize=7, leading=9,
+            textColor=colors.white,
+        )
+
+        headers = ["ID", "Type", "Timestamp (UTC)", "Actor", "Workstation",
+                   "IP", "Integrity", "Record Hash"]
+        table_data = [[Paragraph(f"<b>{h}</b>", header_style) for h in headers]]
+
+        verified = 0
+        for (rec_id, etype, ts, actor, wks, ip, rec_hash, _retention) in rows:
+            try:
+                ok = self.storage.verify_integrity(rec_id)
+            except Exception:
+                ok = False
+            if ok:
+                verified += 1
+
+            rec_hash = rec_hash or ""
+            short_hash = rec_hash[:24] + ("..." if len(rec_hash) > 24 else "")
+
+            table_data.append([
+                Paragraph(str(rec_id), cell_style),
+                Paragraph(str(etype or ""), cell_style),
+                Paragraph(str(ts or ""), cell_style),
+                Paragraph(str(actor or ""), cell_style),
+                Paragraph(str(wks or ""), cell_style),
+                Paragraph(str(ip or ""), cell_style),
+                Paragraph("PASS" if ok else "FAIL", cell_style),
+                Paragraph(short_hash, cell_style),
+            ])
+
+        col_widths = [0.35 * inch, 0.85 * inch, 1.15 * inch, 0.75 * inch,
+                      0.85 * inch, 0.7 * inch, 0.55 * inch, 1.2 * inch]
+        coc_table = LongTable(table_data, colWidths=col_widths, repeatRows=1)
+        coc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2937')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f3f4f6')]),
+        ]))
+        story.append(coc_table)
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(
+            f"Records verified: {verified}/{len(rows)} (HMAC integrity check).",
+            styles['Normal'],
+        ))
+        story.append(Spacer(1, 20))
+
+    def _append_transparency_section(self, story, styles):
+        """Append a transparency-log summary when a ledger is present.
+
+        Best-effort and entirely optional: if no ledger exists or it cannot be
+        read, nothing is added. Surfaces checkpoint count, ledger integrity,
+        and how many checkpoints carry a trusted RFC 3161 timestamp token.
+        """
+        ledger_path = os.path.join(self.output_dir, "transparency_log.jsonl")
+        if not os.path.exists(ledger_path):
+            return
+
+        try:
+            from src.forensics.transparency_log import TransparencyLog
+            try:
+                from src.utils.digital_signer import get_signer
+                signer = get_signer()
+            except Exception:
+                signer = None
+            log = TransparencyLog(ledger_path, signer=signer)
+            result = log.verify()
+            entries = log.read_entries()
+        except Exception:
+            return
+
+        timestamped = sum(
+            1 for e in entries
+            if isinstance(e, dict) and e.get("entry", {}).get("timestamp_token")
+        )
+
+        story.append(Paragraph("Transparency Log", styles['Heading2']))
+        transparency_data = [
+            ["Ledger File:", os.path.basename(ledger_path)],
+            ["Checkpoints Recorded:", str(result.get("entries", 0))],
+            ["Ledger Integrity:", "PASS" if result.get("valid") else "FAIL - see issues"],
+            ["Trusted-Timestamped Checkpoints:", str(timestamped)],
+        ]
+        transparency_table = Table(transparency_data, colWidths=[2.4 * inch, 4 * inch])
+        transparency_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(transparency_table)
+        story.append(Spacer(1, 20))
     
     def _create_signed_pdf_report(self, filename):
         """Create a signed PDF report with all evidence information"""
@@ -205,6 +336,9 @@ class ReportGenerator:
         ]))
         story.append(summary_table)
         story.append(Spacer(1, 20))
+
+        # Per-record chain of custody (court-ready). Safe on an empty database.
+        self._append_chain_of_custody(story, styles)
         
         # Consent status
         consent_summary = self._get_consent_summary()
@@ -249,6 +383,9 @@ class ReportGenerator:
         ]))
         story.append(integrity_table)
         story.append(Spacer(1, 20))
+
+        # Transparency-log summary (only rendered when a ledger is present).
+        self._append_transparency_section(story, styles)
         
         # Digital signature information
         story.append(Paragraph("Digital Signature Information", styles['Heading2']))
