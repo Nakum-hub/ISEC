@@ -364,6 +364,8 @@ function runPythonAction(action, extraArgs = [], extraEnv = {}) {
       collect: 10 * 60 * 1000,
       report: 5 * 60 * 1000,
       export: 5 * 60 * 1000,
+      export_case: 5 * 60 * 1000,
+      transparency_status: 60000,
       set_role: 60000
     };
     const timeoutMs = timeoutMsMap[action] || 30000;
@@ -1657,5 +1659,79 @@ ipcMain.handle('setup-complete', async () => {
     return { success: true };
   } catch (err) {
     return { success: false, message: err.message };
+  }
+});
+
+// ── CASE/UCO Interchange Export Handler ──────────────────────────────────────────────
+// Exports the evidence database as a CASE/UCO-style JSON bundle for
+// interoperability with other forensic tools. Permission gates mirror
+// export-evidence; the backend (export_case action) re-validates everything.
+ipcMain.handle('export-case', async (event, options) => {
+  try {
+    await refreshBackendStatus();
+
+    if (!userPermissions.includes('export')) {
+      return { success: false, filePath: null, message: 'Permission denied: Exporter role required to export a CASE/UCO bundle.' };
+    }
+    if (tamperingDetected) {
+      return { success: false, filePath: null, message: 'CASE/UCO export blocked due to tampering detection!' };
+    }
+    if (lastBackendStatus && typeof lastBackendStatus.evidenceItemsCount === 'number' && lastBackendStatus.evidenceItemsCount <= 0) {
+      return { success: false, filePath: null, message: 'CASE/UCO export blocked: no evidence available.' };
+    }
+
+    const storagePaths = getStoragePaths();
+    const opts = (options && typeof options === 'object') ? options : {};
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const caseOutput = path.join(storagePaths.exportsDir, `evidence-${stamp}.case.json`);
+
+    const extraArgs = ['--case-output', caseOutput];
+    if (opts.includePayload) extraArgs.push('--case-include-payload');
+    if (opts.includeExpired) extraArgs.push('--case-include-expired');
+    if (opts.includeDeleted) extraArgs.push('--case-include-deleted');
+
+    const res = await runPythonAction('export_case', extraArgs);
+    const json = res.json;
+    if (json && json.status) {
+      applyBackendStatus(json.status);
+    }
+
+    if (json && json.success) {
+      if (json.filePath) {
+        recordSessionEvent(
+          'EXPORT', 'CASE/UCO Bundle Exported',
+          `File: ${require('path').basename(json.filePath)}`,
+          currentRole || 'system', 'success'
+        );
+      }
+      return { success: true, filePath: json.filePath, message: 'CASE/UCO bundle exported successfully.' };
+    }
+    return { success: false, filePath: null, message: (json && json.message) ? json.message : 'CASE/UCO export failed.' };
+  } catch (err) {
+    console.error('export-case failed:', err);
+    return { success: false, filePath: null, message: err.message || 'CASE/UCO export failed.' };
+  }
+});
+
+// ── Transparency Log Verification Handler ────────────────────────────────────────────
+// Verifies the append-only transparency log (transparency_status action)
+// and returns the structured verification result for the renderer.
+ipcMain.handle('get-transparency-status', async () => {
+  try {
+    await refreshBackendStatus();
+
+    if (!userPermissions.includes('view')) {
+      return { success: false, transparency: null, message: 'Permission denied: View role required.' };
+    }
+
+    const res = await runPythonAction('transparency_status');
+    const json = res.json;
+    if (json && json.status) {
+      applyBackendStatus(json.status);
+    }
+    return json || { success: false, transparency: null, message: 'Failed to load transparency log status.' };
+  } catch (err) {
+    console.error('get-transparency-status failed:', err);
+    return { success: false, transparency: null, message: err.message || 'Failed to load transparency log status.' };
   }
 });
