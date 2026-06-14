@@ -18,9 +18,19 @@ from src.utils.consent_manager import get_consent_manager, ConsentStatus
 from src.utils.role_manager import get_role_manager, UserRole
 from src.utils.retention_engine import get_retention_engine, RetentionPolicy
 from src.utils.digital_signer import get_signer
+# Forensic transparency log (feature-flagged, default OFF). Importing has no
+# side effects on collection.
+from src.forensics.transparency_log import TransparencyLog, checkpoint_from_database
 import getpass
 import platform
 import socket
+
+
+def _env_truthy(value):
+    """Interpret an environment-variable string as a boolean flag."""
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
 
 
 class EvidenceCollector:
@@ -42,7 +52,8 @@ class EvidenceCollector:
         'file_metadata',
     )
 
-    def __init__(self, output_dir, update_chain_results=True, collect_enabled=True):
+    def __init__(self, output_dir, update_chain_results=True, collect_enabled=True,
+                 transparency_log_enabled=None, transparency_log_path=None):
         self.output_dir = output_dir
         self.collect_enabled = bool(collect_enabled)
         # Initialize secure database with encryption
@@ -101,6 +112,29 @@ class EvidenceCollector:
         
         # Flag to indicate if evidence collection should proceed
         self.collection_allowed = self.collect_enabled and not self.tampering_detected and self.role_manager.has_permission('collect')
+
+        # Optional forensic transparency log (feature-flagged, default OFF).
+        # When enabled, a signed checkpoint of the evidence chain is appended to
+        # an append-only ledger after each collection/export so that rollback
+        # or substitution of the evidence database can be detected later.
+        # Enabling it never changes collection behaviour, and checkpoint
+        # recording is best-effort (failures are logged, not raised).
+        if transparency_log_enabled is None:
+            self.transparency_log_enabled = _env_truthy(os.environ.get("ISEC_TRANSPARENCY_LOG"))
+        else:
+            self.transparency_log_enabled = bool(transparency_log_enabled)
+        self.transparency_log_path = transparency_log_path or os.path.join(output_dir, "transparency_log.jsonl")
+        self.transparency_log = None
+        if self.transparency_log_enabled:
+            try:
+                signer = get_signer()
+            except Exception:
+                signer = None
+            try:
+                self.transparency_log = TransparencyLog(self.transparency_log_path, signer=signer)
+            except Exception as exc:
+                print(f"Warning: failed to initialize transparency log: {exc}")
+                self.transparency_log = None
     
     def _get_local_ip(self):
         """Get the local IP address for chain of custody (offline-safe)."""
@@ -143,6 +177,34 @@ class EvidenceCollector:
             return collector.label()
         return evidence_type
 
+    def _record_transparency_checkpoint(self, reason="collection"):
+        """Append a signed checkpoint to the transparency log (best-effort).
+
+        No-op unless the transparency log is enabled. Never raises: a failure
+        to record a checkpoint must not abort or corrupt evidence collection.
+        """
+        if not self.transparency_log_enabled or self.transparency_log is None:
+            return None
+        try:
+            return checkpoint_from_database(
+                self.transparency_log, self.storage, extra={"reason": reason}
+            )
+        except Exception as exc:
+            print(f"Warning: failed to record transparency-log checkpoint: {exc}")
+            return None
+
+    def verify_transparency_log(self):
+        """Verify the transparency-log ledger and return a summary dict.
+
+        Returns ``{'enabled': False, ...}`` when the feature is disabled.
+        """
+        if not self.transparency_log_enabled or self.transparency_log is None:
+            return {"enabled": False, "valid": True, "entries": 0, "issues": []}
+        result = self.transparency_log.verify()
+        result["enabled"] = True
+        result["ledger_path"] = self.transparency_log_path
+        return result
+
     def collect_all_evidence(self):
         """Collect all types of evidence with consent enforcement and role-based access control"""
         if not self.collect_enabled:
@@ -175,6 +237,9 @@ class EvidenceCollector:
         expired_result = self.retention_engine.flag_expired_evidence()
         if expired_result['flagged'] > 0:
             print(f"Flagged {expired_result['flagged']} expired evidence items")
+
+        # Record a tamper-evident checkpoint (no-op unless enabled).
+        self._record_transparency_checkpoint("collect_all")
 
     def collect_selected_evidence(self, evidence_types):
         """Collect only selected evidence types."""
@@ -210,6 +275,9 @@ class EvidenceCollector:
         expired_result = self.retention_engine.flag_expired_evidence()
         if expired_result['flagged'] > 0:
             print(f"Flagged {expired_result['flagged']} expired evidence items")
+
+        # Record a tamper-evident checkpoint (no-op unless enabled).
+        self._record_transparency_checkpoint("collect_selected")
     
     def export_to_zip(self, export_dir, report_path=None):
         """Export all evidence to a ZIP file with checksum manifest - requires exporter role"""
@@ -273,6 +341,8 @@ class EvidenceCollector:
                 return None
 
             os.replace(tmp_zip_path, final_zip_path)
+            # Record a tamper-evident checkpoint for the export (no-op unless enabled).
+            self._record_transparency_checkpoint("export")
             return final_zip_path
         except Exception as exc:
             print(f"Export failed: {exc}")
