@@ -97,3 +97,43 @@ def test_generate_signed_report_creates_pdf(tmp_path):
     assert os.path.exists(report_path)
     assert os.path.getsize(report_path) > 0
     assert os.path.dirname(report_path) == str(out_dir)
+
+
+def test_resolve_logo_path_honors_env_override(tmp_path, monkeypatch):
+    """ISEC_REPORT_LOGO takes precedence and is returned when it points at a
+    real, non-empty file (deterministic regardless of any bundled asset)."""
+    from PIL import Image as PILImage
+
+    _db, generator, out_dir = _make_generator(tmp_path)
+    logo_path = out_dir / "logo.png"
+    PILImage.new("RGB", (32, 32), (10, 20, 30)).save(str(logo_path))
+    monkeypatch.setenv("ISEC_REPORT_LOGO", str(logo_path))
+
+    assert generator._resolve_logo_path() == str(logo_path)
+
+
+def test_resolve_logo_path_ignores_empty_env_file(tmp_path, monkeypatch):
+    """A zero-byte override is rejected by the non-empty guard."""
+    _db, generator, out_dir = _make_generator(tmp_path)
+    empty_logo = out_dir / "empty.png"
+    empty_logo.write_bytes(b"")
+    monkeypatch.setenv("ISEC_REPORT_LOGO", str(empty_logo))
+
+    # The empty override must not be selected; the env path is never returned.
+    assert generator._resolve_logo_path() != str(empty_logo)
+
+
+def test_generate_signed_report_with_logo(tmp_path, monkeypatch):
+    """End-to-end: a valid logo asset is embedded and a PDF is produced."""
+    from PIL import Image as PILImage
+
+    _db, generator, out_dir = _make_generator(tmp_path)
+    logo_path = out_dir / "logo.png"
+    PILImage.new("RGB", (64, 32), (200, 50, 50)).save(str(logo_path))
+    monkeypatch.setenv("ISEC_REPORT_LOGO", str(logo_path))
+
+    report_path = generator.generate_signed_report()
+
+    assert report_path.endswith(".pdf")
+    assert os.path.exists(report_path)
+    assert os.path.getsize(report_path) > 0
