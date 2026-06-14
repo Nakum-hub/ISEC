@@ -13,6 +13,17 @@ import pytest
 from src.core.collector import EvidenceCollector
 
 
+def _make_collector(out_dir, **kwargs):
+    """Construct an EvidenceCollector, creating the output directory first.
+
+    Mirrors the real caller contract: main.py runs
+    os.makedirs(args.output_dir, exist_ok=True) during bootstrap before the
+    collector is instantiated.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    return EvidenceCollector(out_dir, **kwargs)
+
+
 def _fresh_signer():
     """Reset the signer singleton so get_signer() regenerates keys in the
     current test-isolated state dir (avoids reusing a torn-down dir)."""
@@ -23,7 +34,7 @@ def _fresh_signer():
 
 
 def test_transparency_disabled_by_default(tmp_path):
-    collector = EvidenceCollector(str(tmp_path / "out"))
+    collector = _make_collector(str(tmp_path / "out"))
     assert collector.transparency_log_enabled is False
     assert collector.transparency_log is None
 
@@ -39,8 +50,7 @@ def test_transparency_disabled_by_default(tmp_path):
 
 def test_transparency_enabled_records_and_verifies(tmp_path):
     _fresh_signer()
-    out_dir = tmp_path / "out"
-    collector = EvidenceCollector(str(out_dir), transparency_log_enabled=True)
+    collector = _make_collector(str(tmp_path / "out"), transparency_log_enabled=True)
     assert collector.transparency_log_enabled is True
     assert collector.transparency_log is not None
 
@@ -63,7 +73,7 @@ def test_transparency_enabled_records_and_verifies(tmp_path):
 def test_transparency_enabled_via_env(tmp_path, monkeypatch):
     _fresh_signer()
     monkeypatch.setenv("ISEC_TRANSPARENCY_LOG", "1")
-    collector = EvidenceCollector(str(tmp_path / "out"))
+    collector = _make_collector(str(tmp_path / "out"))
     assert collector.transparency_log_enabled is True
     assert collector.transparency_log is not None
 
