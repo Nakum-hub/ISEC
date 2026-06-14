@@ -25,6 +25,42 @@
     </div>
   </div>
 
+  <!-- Evidence Integrity & Interoperability -->
+  <div class="glassmorphism" style="padding:20px 24px;margin-bottom:20px;">
+    <div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);margin-bottom:5px;">Evidence Integrity &amp; Interoperability</div>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:16px;">Verify the append-only transparency log and export a court-ready CASE/UCO evidence bundle.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+
+      <!-- Transparency Log -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Transparency Log</div>
+        <div style="font-size:0.66rem;color:var(--text-muted);margin-bottom:12px;">RFC 3161-timestamped, signature-verified append-only ledger of evidence events.</div>
+        <button class="btn btn-secondary" id="transparency-verify-btn">Verify Log</button>
+        <div id="transparency-result" style="margin-top:12px;font-family:var(--font-mono);font-size:0.66rem;color:var(--text-secondary);line-height:1.6;"></div>
+      </div>
+
+      <!-- CASE/UCO Export -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">CASE/UCO Export</div>
+        <div style="font-size:0.66rem;color:var(--text-muted);margin-bottom:12px;">Export evidence as a standardized CASE/UCO JSON-LD bundle for cross-tool interoperability.</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:7px;font-size:0.66rem;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="case-include-payload"> Include raw payload data
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:0.66rem;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="case-include-expired"> Include retention-expired items
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:0.66rem;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="case-include-deleted"> Include deleted items
+          </label>
+        </div>
+        <button class="btn btn-primary" id="case-export-btn">Export Bundle</button>
+        <div id="case-export-result" style="margin-top:12px;font-family:var(--font-mono);font-size:0.66rem;color:var(--text-secondary);line-height:1.6;"></div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Framework Grid -->
   <div id="compliance-grid" style="display:flex;flex-direction:column;gap:14px;"></div>
 </section>
