@@ -1,0 +1,61 @@
+# Move this file to .github/workflows/release.yml to enable it.
+#
+# On a pushed tag matching v*, this workflow produces the trust artifacts a
+# buyer/auditor expects on every release:
+#   - CycloneDX SBOM (scripts/generate_sbom.py)
+#   - reproducible source tarball
+#   - SHA256SUMS + release-manifest.json (scripts/generate_release_manifest.py)
+#   - SLSA build-provenance attestation (GitHub OIDC, keyless)
+# and attaches them to the GitHub Release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write      # create/update the GitHub Release
+  id-token: write      # OIDC token for keyless provenance attestation
+  attestations: write  # write the build-provenance attestation
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate SBOM
+        run: |
+          mkdir -p dist sbom
+          python scripts/generate_sbom.py -o sbom/isec-python.cdx.json --app-version "$GITHUB_REF_NAME"
+          cp sbom/isec-python.cdx.json dist/
+
+      - name: Package source tarball
+        run: git archive --format=tar.gz -o dist/isec-source.tar.gz HEAD
+
+      - name: Generate checksum manifest
+        run: python scripts/generate_release_manifest.py dist/ --app-version "$GITHUB_REF_NAME"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/isec-source.tar.gz
+            dist/isec-python.cdx.json
+
+      - name: Publish release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/isec-source.tar.gz
+            dist/isec-python.cdx.json
+            dist/SHA256SUMS
+            dist/release-manifest.json
