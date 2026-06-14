@@ -13,7 +13,14 @@ Examples::
 Exit codes: 0 = success, 1 = export error, 2 = could not open database.
 """
 import argparse
+import os
 import sys
+
+# Allow running as a plain script (python scripts/export_case.py) by making the
+# repository root importable, regardless of the current working directory.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from src.storage.database import EvidenceDatabase
 from src.forensics.case_export import export_case_bundle
