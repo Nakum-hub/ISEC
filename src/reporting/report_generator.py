@@ -115,6 +115,48 @@ class ReportGenerator:
         # We'll call the storage method to get the verification result
         return self.storage.get_hash_chain_verification_result()
 
+    def _resolve_logo_path(self):
+        """Return a bundled logo asset path when one is present, else None.
+
+        Checks the ISEC_REPORT_LOGO environment override first, then the
+        Electron UI asset and a repo-level assets fallback. Returns the first
+        existing, non-empty path; never raises.
+        """
+        candidates = []
+        env_logo = os.environ.get("ISEC_REPORT_LOGO")
+        if env_logo:
+            candidates.append(env_logo)
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        repo_root = os.path.dirname(os.path.dirname(module_dir))
+        candidates.append(os.path.join(repo_root, "ui", "assets", "icon.png"))
+        candidates.append(os.path.join(repo_root, "assets", "icon.png"))
+        for path in candidates:
+            try:
+                if path and os.path.exists(path) and os.path.getsize(path) > 0:
+                    return path
+            except Exception:
+                continue
+        return None
+
+    def _append_logo(self, story):
+        """Embed an organization logo at the top of the report when available.
+
+        Entirely optional and best-effort: when no logo asset is present or the
+        image cannot be loaded, the report is generated without it and no
+        partial content is appended.
+        """
+        logo_path = self._resolve_logo_path()
+        if not logo_path:
+            return
+        try:
+            logo = Image(logo_path)
+            logo._restrictSize(1.5 * inch, 1.5 * inch)
+            logo.hAlign = 'CENTER'
+            story.append(logo)
+            story.append(Spacer(1, 12))
+        except Exception:
+            return
+
     def _append_chain_of_custody(self, story, styles):
         """Append a per-record chain-of-custody table to the report story.
 
@@ -229,7 +271,15 @@ class ReportGenerator:
     
     def _create_signed_pdf_report(self, filename):
         """Create a signed PDF report with all evidence information"""
-        doc = SimpleDocTemplate(filename, pagesize=letter)
+        doc = SimpleDocTemplate(
+            filename,
+            pagesize=letter,
+            title="Internal Security Evidence Collector Report",
+            author="Internal Security Evidence Collector (ISEC)",
+            subject="Forensic evidence collection report with chain of custody",
+            creator="ISEC ReportGenerator",
+            keywords="forensics, evidence, chain of custody, ISEC",
+        )
         story = []
         
         styles = getSampleStyleSheet()
@@ -242,6 +292,9 @@ class ReportGenerator:
             spaceAfter=30,
             alignment=1  # Center alignment
         )
+        
+        # Optional organization logo (best-effort; skipped when no asset present).
+        self._append_logo(story)
         
         # Report title
         story.append(Paragraph("Internal Security Evidence Collector Report", title_style))
