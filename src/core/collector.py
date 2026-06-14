@@ -21,6 +21,9 @@ from src.utils.digital_signer import get_signer
 # Forensic transparency log (feature-flagged, default OFF). Importing has no
 # side effects on collection.
 from src.forensics.transparency_log import TransparencyLog, checkpoint_from_database
+# Optional RFC 3161 trusted timestamping (free public TSA). Importing has no
+# side effects and performs no network I/O until a timestamper is invoked.
+from src.forensics.rfc3161 import make_timestamper
 import getpass
 import platform
 import socket
@@ -53,7 +56,8 @@ class EvidenceCollector:
     )
 
     def __init__(self, output_dir, update_chain_results=True, collect_enabled=True,
-                 transparency_log_enabled=None, transparency_log_path=None):
+                 transparency_log_enabled=None, transparency_log_path=None,
+                 timestamp_authority_url=None):
         self.output_dir = output_dir
         self.collect_enabled = bool(collect_enabled)
         # Initialize secure database with encryption
@@ -135,6 +139,25 @@ class EvidenceCollector:
             except Exception as exc:
                 print(f"Warning: failed to initialize transparency log: {exc}")
                 self.transparency_log = None
+
+        # Optional RFC 3161 trusted timestamping of checkpoints. Active only
+        # when the transparency log is enabled AND a TSA URL is configured
+        # (constructor arg or the ISEC_TSA_URL environment variable). Reputable
+        # public TSAs offer this for free; the default behaviour with no URL
+        # set is unchanged and performs no network I/O. The timestamper never
+        # raises -- a token is fetched best-effort per checkpoint.
+        self.timestamp_authority_url = timestamp_authority_url or os.environ.get("ISEC_TSA_URL")
+        self._timestamper = None
+        if (
+            self.transparency_log_enabled
+            and self.transparency_log is not None
+            and self.timestamp_authority_url
+        ):
+            try:
+                self._timestamper = make_timestamper(self.timestamp_authority_url)
+            except Exception as exc:
+                print(f"Warning: failed to initialize trusted timestamper: {exc}")
+                self._timestamper = None
     
     def _get_local_ip(self):
         """Get the local IP address for chain of custody (offline-safe)."""
@@ -182,12 +205,17 @@ class EvidenceCollector:
 
         No-op unless the transparency log is enabled. Never raises: a failure
         to record a checkpoint must not abort or corrupt evidence collection.
+        When a trusted timestamper is configured, the checkpoint also embeds a
+        free RFC 3161 timestamp token (fetched best-effort).
         """
         if not self.transparency_log_enabled or self.transparency_log is None:
             return None
         try:
             return checkpoint_from_database(
-                self.transparency_log, self.storage, extra={"reason": reason}
+                self.transparency_log,
+                self.storage,
+                extra={"reason": reason},
+                timestamper=self._timestamper,
             )
         except Exception as exc:
             print(f"Warning: failed to record transparency-log checkpoint: {exc}")
