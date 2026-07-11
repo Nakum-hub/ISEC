@@ -287,6 +287,17 @@
     if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.key==='R') { e.preventDefault(); navigateTo&&navigateTo('report'); }
   });
 
+  // ── Top-bar ⌘K button (CSP forbids inline onclick) ───────────
+  function bindCmdHintButton() {
+    const btn = document.getElementById('cmd-hint-btn');
+    if (btn) btn.addEventListener('click', open);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindCmdHintButton);
+  } else {
+    bindCmdHintButton();
+  }
+
   window.openCommandPalette = open;
   window.closeCommandPalette = close;
 })();

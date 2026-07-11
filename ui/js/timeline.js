@@ -80,9 +80,11 @@
     const exportBtn = document.getElementById('timeline-export-btn');
     if (exportBtn) exportBtn.addEventListener('click', exportTimeline);
 
-    // Clear filters
+    // Clear filters (toolbar button + empty-state button)
     const clearBtn = document.getElementById('clear-filters-btn');
     if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+    const emptyClearBtn = document.getElementById('empty-clear-filters-btn');
+    if (emptyClearBtn) emptyClearBtn.addEventListener('click', clearFilters);
 
     // Filter pills
     document.querySelectorAll('.filter-pill').forEach(pill => {
@@ -249,6 +251,12 @@
       if (typeof viewEvidenceDetail === 'function') viewEvidenceDetail(item.id);
     });
 
+    // Copy button (CSP forbids inline onclick)
+    el.querySelector('.copy-item-btn') && el.querySelector('.copy-item-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyItemToClipboard(item.id);
+    });
+
     return el;
   }
 
@@ -288,7 +296,7 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Full Detail
         </button>
-        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.72rem;" onclick="copyItemToClipboard(${item.id})">
+        <button class="btn btn-secondary copy-item-btn" style="padding:5px 12px;font-size:0.72rem;">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           Copy
         </button>

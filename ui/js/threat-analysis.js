@@ -186,7 +186,7 @@
       const color = sevColor[s] || 'var(--text-muted)';
       const ts = item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Unknown';
       return `
-        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-left:3px solid ${color};border-radius:6px;padding:10px 12px;cursor:pointer;transition:background 0.15s;" onclick="viewEvidenceDetail && viewEvidenceDetail(${item.id})">
+        <div class="anomaly-item" data-evidence-id="${item.id}" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-left:3px solid ${color};border-radius:6px;padding:10px 12px;cursor:pointer;transition:background 0.15s;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
             <div style="font-family:var(--font-ui);font-size:0.78rem;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(item.description||'')}">
               ${escHtml(item.description||'(no description)')}
@@ -197,6 +197,14 @@
         </div>
       `;
     }).join('');
+
+    // Bind anomaly click-through (CSP forbids inline onclick)
+    container.querySelectorAll('.anomaly-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = parseInt(el.getAttribute('data-evidence-id'), 10);
+        if (Number.isFinite(id) && typeof viewEvidenceDetail === 'function') viewEvidenceDetail(id);
+      });
+    });
   }
 
   function renderPatterns(patterns) {

@@ -1319,8 +1319,8 @@ ipcMain.handle('window-close',    () => { if (mainWindow) mainWindow.close(); })
 // ── Evidence Stats Handler ───────────────────────────────────────
 ipcMain.handle('get-evidence-stats', async () => {
   try {
-    const result = await runBackend(['--action', 'get_backend_status']);
-    const status = JSON.parse(result);
+    await refreshBackendStatus();
+    const status = lastBackendStatus || {};
     return {
       success: true,
       evidenceTypeCounts: status.evidenceTypeCounts || {},
@@ -1466,10 +1466,6 @@ ipcMain.handle('get-reports-list', async () => {
   }
 });
 
-// ── Record role changes as real audit events ────────────────────
-// Patch: intercept successful set-user-role to log real event
-const _origSetUserRoleHandler = ipcMain.listeners ? null : null; // patch via event after handler runs
-
 // ══════════════════════════════════════════════════════════════
 // FIRST-RUN SETUP SYSTEM
 // ══════════════════════════════════════════════════════════════
@@ -1574,9 +1570,9 @@ ipcMain.handle('setup-test-backend', async () => {
   try {
     // 1. Check Python exists
     const { execFileSync } = require('child_process');
-    const backendPaths = getBackendPaths();
+    const pythonPath = resolvePythonPath();
     try {
-      const ver = execFileSync(backendPaths.pythonPath, ['--version'], { timeout: 5000 }).toString().trim();
+      const ver = execFileSync(pythonPath, ['--version'], { timeout: 5000 }).toString().trim();
       result.pythonOk = true;
       result.pythonVersion = ver;
     } catch (_) {
