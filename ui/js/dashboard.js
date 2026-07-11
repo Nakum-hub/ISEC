@@ -11,10 +11,17 @@ let _charts = { donut: null, line: null, gauge: null, sparkline: null };
 let _dashRefresh = null;
 let _chartRange = 30;
 let _cachedTimeline = [];
+let _dashEventsBound = false;
 
 // ── Lifecycle ────────────────────────────────────────────────────
 async function initializeDashboard() {
-  bindDashboardEvents();
+  // Dashboard re-initialises on every navigation for fresh data, but the
+  // DOM listeners must only ever be bound once (duplicates would fire
+  // evidence collection multiple times per click).
+  if (!_dashEventsBound) {
+    _dashEventsBound = true;
+    bindDashboardEvents();
+  }
   if (!_dashRefresh) {
     _dashRefresh = setInterval(() => loadDashboardStats(), 20000);
   }
@@ -38,6 +45,13 @@ function bindDashboardEvents() {
     btn.addEventListener('mouseleave', function() {
       this.style.transform = '';
       this.style.boxShadow = '';
+    });
+  });
+
+  // Chart range buttons (CSP forbids inline onclick)
+  document.querySelectorAll('#chart-timeframe .btn[data-range]').forEach(btn => {
+    btn.addEventListener('click', function () {
+      setChartRange(parseInt(this.getAttribute('data-range'), 10) || 30, this);
     });
   });
 

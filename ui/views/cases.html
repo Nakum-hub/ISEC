@@ -5,11 +5,11 @@
       <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted);margin-top:4px;letter-spacing:0.12em;text-transform:uppercase;">Forensic Investigation Lifecycle</div>
     </div>
     <div class="section-actions">
-      <button class="btn btn-secondary" id="cases-filter-all"   onclick="filterCases('all',this)">All</button>
-      <button class="btn btn-secondary" id="cases-filter-open"  onclick="filterCases('OPEN',this)">Open</button>
-      <button class="btn btn-secondary" id="cases-filter-active" onclick="filterCases('ACTIVE',this)">Active</button>
-      <button class="btn btn-secondary" id="cases-filter-closed" onclick="filterCases('CLOSED',this)">Closed</button>
-      <button class="btn btn-primary"   id="new-case-btn" onclick="openNewCaseModal()">+ New Case</button>
+      <button class="btn btn-secondary" id="cases-filter-all"   data-filter="all">All</button>
+      <button class="btn btn-secondary" id="cases-filter-open"  data-filter="OPEN">Open</button>
+      <button class="btn btn-secondary" id="cases-filter-active" data-filter="ACTIVE">Active</button>
+      <button class="btn btn-secondary" id="cases-filter-closed" data-filter="CLOSED">Closed</button>
+      <button class="btn btn-primary"   id="new-case-btn">+ New Case</button>
     </div>
   </div>
 
@@ -23,5 +23,5 @@
 
   <!-- Cases Grid -->
   <div id="cases-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
-  <div id="cases-empty" class="empty-state hidden"><div class="empty-state-icon">🗂</div><span>No cases yet. Create your first investigation case.</span><button class="btn btn-primary" onclick="openNewCaseModal()" style="margin-top:12px;">+ New Case</button></div>
+  <div id="cases-empty" class="empty-state hidden"><div class="empty-state-icon">🗂</div><span>No cases yet. Create your first investigation case.</span><button class="btn btn-primary" id="cases-empty-new-btn" style="margin-top:12px;">+ New Case</button></div>
 </section>

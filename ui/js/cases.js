@@ -9,9 +9,14 @@
   // ── Lifecycle ─────────────────────────────────────────────────
   function initCases() {
     _cases = loadCases();
-    document.getElementById('compliance-refresh-btn') && null; // not here
-    document.getElementById('new-case-btn') && document.getElementById('new-case-btn').addEventListener('click', openNewCaseModal);
-    document.getElementById('cases-refresh-btn') && document.getElementById('cases-refresh-btn').addEventListener('click', renderCases);
+    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    bind('new-case-btn', openNewCaseModal);
+    bind('cases-empty-new-btn', openNewCaseModal);
+    bind('cases-refresh-btn', renderCases);
+    // Status filter buttons (CSP forbids inline onclick)
+    document.querySelectorAll('#cases .section-actions .btn[data-filter]').forEach(btn => {
+      btn.addEventListener('click', function () { filterCases(this.getAttribute('data-filter'), this); });
+    });
     renderCases();
   }
 
@@ -32,7 +37,7 @@
   // ── Filter ────────────────────────────────────────────────────
   window.filterCases = function(status, btn) {
     _filter = status;
-    document.querySelectorAll('#cases .section-actions .btn-secondary').forEach(b => {
+    document.querySelectorAll('#cases .section-actions .btn[data-filter]').forEach(b => {
       b.className = 'btn btn-secondary';
     });
     if (btn) btn.className = 'btn btn-primary';
@@ -60,8 +65,7 @@
     const statusColor   = { OPEN:'var(--cyan-bright)', ACTIVE:'var(--success)', CLOSED:'var(--text-muted)', ARCHIVED:'#4d6080' };
 
     grid.innerHTML = filtered.sort((a,b) => b.created - a.created).map(c => `
-      <div class="glassmorphism case-card" style="padding:18px;cursor:pointer;transition:all 0.2s;border-left:3px solid ${statusColor[c.status]||'var(--border-dim)'};"
-        onclick="openCaseDetail('${c.id}')" onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+      <div class="glassmorphism case-card" data-case-id="${escHtml(c.id)}" style="padding:18px;cursor:pointer;transition:all 0.2s;border-left:3px solid ${statusColor[c.status]||'var(--border-dim)'};">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
           <div>
             <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-bottom:3px;">${escHtml(c.id)}</div>
@@ -82,6 +86,19 @@
           <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);">${new Date(c.created).toLocaleDateString()}</div>
         </div>
       </div>`).join('');
+
+    // Bind card interactions (CSP forbids inline handlers)
+    grid.querySelectorAll('.case-card').forEach(card => {
+      card.addEventListener('click', () => openCaseDetail(card.getAttribute('data-case-id')));
+      card.addEventListener('mouseenter', () => {
+        card.style.transform = 'translateY(-2px)';
+        card.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+      });
+    });
   }
 
   function updateStats() {

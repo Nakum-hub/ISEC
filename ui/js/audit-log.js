@@ -116,7 +116,7 @@
       const rc  = RC[e.result] || 'var(--text-muted)';
       const ts  = e.ts ? new Date(e.ts).toLocaleString() : '—';
       const act = (e.action || 'SYSTEM').toUpperCase();
-      return `<tr onmouseenter="this.style.background='rgba(0,200,255,0.03)'" onmouseleave="this.style.background='transparent'" style="border-bottom:1px solid rgba(255,255,255,0.03);transition:background 0.1s;">
+      return `<tr class="audit-row" style="border-bottom:1px solid rgba(255,255,255,0.03);transition:background 0.1s;">
         <td style="padding:9px 12px;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);text-align:center;">${e.seq || '—'}</td>
         <td style="padding:9px 12px;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);white-space:nowrap;">${ts}</td>
         <td style="padding:9px 12px;"><span style="background:${ac}15;color:${ac};border:1px solid ${ac}33;padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:8px;letter-spacing:0.06em;">${act}</span></td>
@@ -128,6 +128,12 @@
         <td style="padding:9px 12px;"><span style="background:${rc}15;color:${rc};border:1px solid ${rc}33;padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:8px;">${e.result || '—'}</span></td>
       </tr>`;
     }).join('');
+
+    // Row hover highlight (CSP forbids inline handlers)
+    tbody.querySelectorAll('tr.audit-row').forEach(row => {
+      row.addEventListener('mouseenter', () => { row.style.background = 'rgba(0,200,255,0.03)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+    });
 
     // Pagination
     const pag = document.getElementById('audit-pagination');
