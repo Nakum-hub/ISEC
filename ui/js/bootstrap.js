@@ -50,8 +50,14 @@
     const bridge = window.isec;
     if (!bridge || typeof bridge.invoke !== 'function') return;
     try {
-      const html = await bridge.invoke('read-ui-fragment', { fragmentPath });
-      if (html && typeof html === 'string') container.innerHTML = html;
+      // main.js expects the relative path string and answers { success, html }.
+      const res = await bridge.invoke('read-ui-fragment', fragmentPath);
+      const html = (typeof res === 'string') ? res : (res && res.success ? res.html : null);
+      if (html && typeof html === 'string') {
+        container.innerHTML = html;
+      } else {
+        console.warn(`Fragment load failed [${fragmentPath}]:`, (res && res.message) || 'empty response');
+      }
     } catch (err) {
       console.warn(`Fragment load failed [${fragmentPath}]:`, err.message);
     }
