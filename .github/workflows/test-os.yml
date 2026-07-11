@@ -53,4 +53,23 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
       - name: Run tests
-        run: python -m pytest -q
+        shell: bash
+        run: |
+          python -m pytest -q 2>&1 | tee pytest-output.txt
+          exit "${PIPESTATUS[0]}"
+      - name: Annotate failures
+        if: failure()
+        shell: bash
+        run: |
+          # Surface each failing test as a workflow annotation so failures
+          # are diagnosable straight from the Checks API.
+          grep -E "^(FAILED|ERROR) " pytest-output.txt | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          tail -n 60 pytest-output.txt
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-windows
+          path: pytest-output.txt
