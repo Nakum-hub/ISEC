@@ -156,7 +156,12 @@ class EvidenceDatabase:
             return False
 
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            # NOTE: "with sqlite3.connect(...)" only manages the transaction —
+            # it does NOT close the connection. An unclosed handle keeps the
+            # database file locked on Windows, which breaks callers that clean
+            # up temporary directories (e.g. verify_export). Close explicitly.
+            conn = sqlite3.connect(self.db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='evidence'")
                 if (cursor.fetchone() or [0])[0] == 0:
@@ -164,6 +169,8 @@ class EvidenceDatabase:
                 cursor.execute("SELECT COUNT(*) FROM evidence")
                 evidence_count = (cursor.fetchone() or [0])[0]
                 return evidence_count > 0
+            finally:
+                conn.close()
         except Exception:
             return False
             
