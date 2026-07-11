@@ -213,6 +213,7 @@ class BrowserHistoryCollector(BaseCollector):
         
         # Create a temporary copy of the database to avoid locking issues
         temp_path = f"{profile_path}_temp_copy"
+        conn = None
         try:
             shutil.copy2(profile_path, temp_path)
             
@@ -270,10 +271,17 @@ class BrowserHistoryCollector(BaseCollector):
                     # Skip if we can't parse the date
                     continue
             
-            conn.close()
         except Exception as e:
             print(f"Error reading {browser} history database: {str(e)}")
         finally:
+            # Always close before removing the temp copy: an open SQLite
+            # handle keeps the file locked on Windows and os.remove would
+            # fail with WinError 32.
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             # Clean up the temporary file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
