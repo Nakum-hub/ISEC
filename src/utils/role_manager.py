@@ -63,11 +63,13 @@ class RoleManager:
         self.session_locked = False
         self._load_auth_state()
 
-        # Initialize with default role if no role is set
+        # Initialize with default role if no role is set. This implicit
+        # fallback is not a user action, so it must not write an audit
+        # record into the evidence hash chain.
         self.current_role = self._load_user_role()
         if not self.current_role:
             self.current_role = UserRole.REVIEWER
-            self.set_role(self.current_role)
+            self.set_role(self.current_role, record_audit=False)
     
     def _derive_key_from_system_info(self):
         """Derive encryption key from system-specific information.
@@ -333,8 +335,14 @@ class RoleManager:
             self._register_success(provided_token=provided_token)
             return True, "Role change authorized."
 
-    def set_role(self, role, assigned_by='system'):
-        """Set the current user's role"""
+    def set_role(self, role, assigned_by='system', record_audit=True):
+        """Set the current user's role.
+
+        ``record_audit=False`` skips writing a ``role_assignment`` record into
+        the evidence hash chain. It is used only for the implicit default-role
+        fallback on first run, which is not a user action and must not pollute
+        the chain of custody before any evidence has been collected.
+        """
         if not isinstance(role, UserRole):
             raise ValueError("Role must be a valid UserRole enum value")
         
@@ -377,11 +385,12 @@ class RoleManager:
                     f.write(encrypted_data)
             
             # Also save to database for audit trail - fix: remove 'notes' parameter
-            self.storage.store_evidence(
-                evidence_type="role_assignment",
-                data=role_data,
-                actor=self.user
-            )
+            if record_audit:
+                self.storage.store_evidence(
+                    evidence_type="role_assignment",
+                    data=role_data,
+                    actor=self.user
+                )
             
             self.current_role = role
             return True
